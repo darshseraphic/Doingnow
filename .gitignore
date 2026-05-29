@@ -155,3 +155,8 @@ native/
 # Miscellaneous
 # -----------------------------------
 *.class
+
+# Gradle wrapper cache
+wrapper/
+android/gradle/wrapper/
+.gradle/
