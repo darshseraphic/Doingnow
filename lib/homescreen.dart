@@ -1752,12 +1752,12 @@ class AppTheme {
   };
   // Card surface: blends with #0A0A0A bg in dark
   static Color get cardSurface => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFFFFFFF),
+    AppThemeModePreference.light => const Color(0xFFFAFAFA),
     AppThemeModePreference.dark => const Color(0xFF111111),
   };
   // Card border: gray in light, #121212 in dark
   static Color get cardBorder => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFD0CCCF),
+    AppThemeModePreference.light => const Color(0xFFc7c7c7),
     AppThemeModePreference.dark => const Color(0xFF1F1F1F),
   };
   // Upcoming (future) day color
