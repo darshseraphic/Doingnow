@@ -2524,7 +2524,6 @@ class _AppRootState extends State<_AppRoot> {
     _initData();
   }
 
-  // Sync peek so splash shows logo immediately for returning users
   void _checkOnboardedSync() {
     try {
       final dir = _appDir();
@@ -2609,14 +2608,9 @@ class _AppRootState extends State<_AppRoot> {
 
   @override
   Widget build(BuildContext context) {
-    // Show onboarding fullscreen — no splash needed for new users
     if (_ready && _showOnboarding) {
       return _OnboardingFlow(onComplete: _onOnboardingComplete);
     }
-    // Single persistent _SplashTransition — never recreated so animation
-    // state is preserved across the !ready → ready transition.
-    // For new users: showLogo=false → skipToApp immediately, HomeScreen visible
-    // For returning users: showLogo=true → logo fades in, then progress, then HomeScreen
     return _SplashTransition(
       key: const ValueKey('splash'),
       showLogo: _hasOnboarded,
@@ -2625,13 +2619,6 @@ class _AppRootState extends State<_AppRoot> {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════
-//  SPLASH TRANSITION (Cinematic Reveal)
-// ═══════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════
-//  SPLASH TRANSITION - The Widget
-// ═══════════════════════════════════════════════════════════
 
 class _SplashTransition extends StatefulWidget {
   final bool showLogo;
@@ -2648,10 +2635,6 @@ class _SplashTransition extends StatefulWidget {
   State<_SplashTransition> createState() => _SplashTransitionState();
 }
 
-// ═══════════════════════════════════════════════════════════
-//  SPLASH TRANSITION - The Logic and UI
-// ═══════════════════════════════════════════════════════════
-
 class _SplashTransitionState extends State<_SplashTransition>
     with TickerProviderStateMixin {
   late final AnimationController _logoCtrl = AnimationController(
@@ -2664,7 +2647,6 @@ class _SplashTransitionState extends State<_SplashTransition>
   );
   late final AnimationController _appCtrl = AnimationController(
     vsync: this,
-    // INCREASED DURATION: This controls how long the app takes to go from 0% to 100% capacity
     duration: const Duration(milliseconds: 500),
   );
 
@@ -2785,7 +2767,6 @@ class _SplashTransitionState extends State<_SplashTransition>
       backgroundColor: AppTheme.bg,
       body: Stack(
         children: [
-          // 1. THE APP
           if (_appMounted)
             FadeTransition(
               opacity: _appFade,
@@ -2797,13 +2778,10 @@ class _SplashTransitionState extends State<_SplashTransition>
                 ),
               ),
             ),
-
-          // 2. THE PROGRESS BAR LAYER
           if (_progressVisible)
             IgnorePointer(
               child: AnimatedOpacity(
                 opacity: _progressFadingOut ? 0.0 : 1.0,
-                // FIXED: Changed to 800ms to perfectly match the _appCtrl duration for a 1:1 crossfade
                 duration: const Duration(milliseconds: 1000),
                 child: Center(
                   child: AnimatedBuilder(
@@ -2854,8 +2832,6 @@ class _SplashTransitionState extends State<_SplashTransition>
                 ),
               ),
             ),
-
-          // 3. LOGO + "doingnow" TEXT LAYER
           if (_logoVisible)
             FadeTransition(
               opacity: _logoCtrl,
@@ -2892,9 +2868,6 @@ class _SplashTransitionState extends State<_SplashTransition>
     );
   }
 }
-// ═══════════════════════════════════════════════════════════
-//  SLIDE ROUTE (right → left push, left → right pop)
-// ═══════════════════════════════════════════════════════════
 
 class _SlideRoute<T> extends PageRouteBuilder<T> {
   final Widget child;
@@ -2953,7 +2926,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onTabTap(int i) {
     setState(() {
-      // Re-mount YearTab when entering — triggers dot fill animation
       if (i == 2 && _tab != 2) {
         _yearKey = UniqueKey();
         _pages = [
@@ -2964,7 +2936,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _pages[4],
         ];
       }
-      // Re-mount StatisticsTab when entering — triggers chart animation
       if (i == 3 && _tab != 3) {
         _statsKey = UniqueKey();
         _pages = [
@@ -3036,9 +3007,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-// ═══════════════════════════════════════════════════════════
-//  MONTH TAB
-// ═══════════════════════════════════════════════════════════
 
 class MonthTab extends StatelessWidget {
   final HabitStore store;
@@ -3141,24 +3109,21 @@ class _MonthCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.fromLTRB(
-          10, 8, 10, 8), // Slightly rounded out the padding for better balance
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
         color: AppTheme.cardSurface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.cardBorder, width: 1.0),
       ),
       child: Column(
-          mainAxisSize:
-              MainAxisSize.max, // Let the column fill the GridView cell height
-          mainAxisAlignment: MainAxisAlignment
-              .spaceBetween, // Push header up and calendar down
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // HEADER GROUP
             Row(children: [
               Container(
-                width: 24, height: 24, // Fixed invalid circle shape dimensions
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppTheme.bg,
@@ -3195,8 +3160,6 @@ class _MonthCard extends StatelessWidget {
                 ),
               ),
             ]),
-
-            // CALENDAR GROUP
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -3262,9 +3225,6 @@ class _MonthCard extends StatelessWidget {
     );
   }
 }
-// ═══════════════════════════════════════════════════════════
-//  WEEK TAB
-// ═══════════════════════════════════════════════════════════
 
 class WeekTab extends StatelessWidget {
   final HabitStore store;
@@ -3403,7 +3363,7 @@ class _WeekCard extends StatelessWidget {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: isOtherMonth || isPast || isFuture
-                    ? null // locked — not tappable
+                    ? null
                     : () => _handleHabitDayTap(context, store, habit, date),
                 child: SizedBox(
                   height: 26,
@@ -6609,7 +6569,6 @@ void _handleHabitDayTap(
   Habit habit,
   DateTime date,
 ) {
-  // Only today is tappable — past days are locked, future days are locked
   if (!_isSameDate(date, DateTime.now())) return;
   if (!habit.isScheduledOn(date)) return;
   store.toggleComplete(habit, date);
