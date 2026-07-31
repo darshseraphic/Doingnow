@@ -298,10 +298,6 @@ IconData _iconFromCP(int cp) {
   return kDefaultHabitIcon;
 }
 
-// ═══════════════════════════════════════════════════════════
-//  NOTIFICATION SERVICE
-// ═══════════════════════════════════════════════════════════
-
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
@@ -311,7 +307,8 @@ class NotificationService {
 
   static const _channelId = 'habit_reminders';
   static const _androidDetails = AndroidNotificationDetails(
-    _channelId, 'Habit Reminders',
+    _channelId,
+    'Habit Reminders',
     channelDescription: 'Daily habit reminders',
     importance: Importance.max,
     priority: Priority.max,
@@ -330,7 +327,6 @@ class NotificationService {
 
   Future<void> init() async {
     if (_initialized) return;
-    // Timezone BEFORE plugin init — scheduling depends on tz.local
     _initTimezone();
     await _plugin.initialize(
       const InitializationSettings(
@@ -347,7 +343,8 @@ class NotificationService {
       final ap = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await ap?.createNotificationChannel(const AndroidNotificationChannel(
-        _channelId, 'Habit Reminders',
+        _channelId,
+        'Habit Reminders',
         description: 'Daily habit reminders',
         importance: Importance.max,
         playSound: true,
@@ -358,9 +355,6 @@ class NotificationService {
     _initialized = true;
   }
 
-  // Uses platform timezone name (IANA) — far more reliable than scanning
-  // all 600 zones by offset which picks wrong zone when multiple zones
-  // share the same UTC offset (e.g. UTC+5:30 matches 3 zones).
   void _initTimezone() {
     try {
       final tzName = DateTime.now().timeZoneName;
@@ -383,7 +377,9 @@ class NotificationService {
       final ap = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await ap?.requestNotificationsPermission();
-      try { await ap?.requestExactAlarmsPermission(); } catch (_) {}
+      try {
+        await ap?.requestExactAlarmsPermission();
+      } catch (_) {}
     } else if (Platform.isIOS) {
       final ip = _plugin.resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin>();
@@ -391,34 +387,25 @@ class NotificationService {
     }
   }
 
-  // Opens Android battery optimization settings for this specific app.
-  // Uses the standard ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS Intent URI
-  // which directly opens the exemption dialog for this package.
   Future<void> requestBatteryOptimizationAccess() async {
     if (!Platform.isAndroid) return;
-    // Intent URI format — the only reliable way to open Android settings
-    // from Flutter/url_launcher. The 'action' in the Intent URI must match
-    // Android's action string exactly.
-    //
-    // This opens: Settings > Battery > App > doingnow > No restrictions
     const packageId = 'com.example.doingnow';
     final uri = Uri.parse(
       'intent:#Intent;'
-          'action=android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS;'
-          'data=package:$packageId;'
-          'end',
+      'action=android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS;'
+      'data=package:$packageId;'
+      'end',
     );
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
-      // Fallback: open app details page where user can find battery settings
       try {
         await launchUrl(
           Uri.parse(
             'intent:#Intent;'
-                'action=android.settings.APPLICATION_DETAILS_SETTINGS;'
-                'data=package:$packageId;'
-                'end',
+            'action=android.settings.APPLICATION_DETAILS_SETTINGS;'
+            'data=package:$packageId;'
+            'end',
           ),
           mode: LaunchMode.externalApplication,
         );
@@ -426,7 +413,6 @@ class NotificationService {
     }
   }
 
-  // Collision-free ID: each habit gets 10 unique slots (one per weekday 0-6)
   int _id(String habitId, int weekday) {
     final base = (int.tryParse(habitId) ?? habitId.hashCode.abs()) % 100000000;
     return base * 10 + weekday;
@@ -445,27 +431,29 @@ class NotificationService {
       final id = _id(habit.id, weekday);
       final fireAt = _nextWeekday(weekday, habit.reminder.time);
       final body = 'Time to complete the ${habit.title} habit';
-
-      // alarmClock = AlarmManager.setAlarmClock()
-      // This is the SAME API used by Google Clock, Samsung Clock, and every
-      // calendar/reminder app. Android guarantees delivery even when app is
-      // killed — OEMs cannot cancel it without breaking their own clock apps.
       try {
         await _plugin.zonedSchedule(
-          id, 'doingnow', body, fireAt, _details,
+          id,
+          'doingnow',
+          body,
+          fireAt,
+          _details,
           androidScheduleMode: AndroidScheduleMode.alarmClock,
           uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+              UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         );
       } catch (e) {
-        // Fallback: exactAllowWhileIdle (less reliable on aggressive OEMs)
         try {
           await _plugin.zonedSchedule(
-            id, 'doingnow', body, fireAt, _details,
+            id,
+            'doingnow',
+            body,
+            fireAt,
+            _details,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
+                UILocalNotificationDateInterpretation.absoluteTime,
             matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
           );
         } catch (e2) {
@@ -486,16 +474,23 @@ class NotificationService {
   Future<void> rescheduleAll(List<Habit> habits) async {
     if (!_initialized) return;
     for (final h in habits) {
-      if (h.notificationEnabled && !h.archived) await scheduleHabit(h);
-      else await cancelHabit(h.id);
+      if (h.notificationEnabled && !h.archived)
+        await scheduleHabit(h);
+      else
+        await cancelHabit(h.id);
     }
   }
 
   tz.TZDateTime _nextWeekday(int weekday, TimeOfDay time) {
-    final dartWeekday = weekday + 1; // Dart: Mon=1..Sun=7
+    final dartWeekday = weekday + 1;
     final now = tz.TZDateTime.now(tz.local);
     var candidate = tz.TZDateTime(
-      tz.local, now.year, now.month, now.day, time.hour, time.minute,
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      time.hour,
+      time.minute,
     );
     for (int i = 0; i < 14; i++) {
       if (candidate.weekday == dartWeekday && candidate.isAfter(now)) {
@@ -505,52 +500,13 @@ class NotificationService {
     }
     return now.add(const Duration(days: 7));
   }
-
 }
-// ═══════════════════════════════════════════════════════════
-//  HOME SCREEN WIDGET UPDATER
-//  Uses home_widget package. Add to pubspec:
-//    home_widget: ^0.7.0
-//  And follow setup at pub.dev/packages/home_widget
-// ═══════════════════════════════════════════════════════════
 
 class HomeWidgetUpdater {
   HomeWidgetUpdater._();
   static final HomeWidgetUpdater instance = HomeWidgetUpdater._();
-
-  // Call this whenever habit data changes to update the home screen widget
-  Future<void> updateWidget(List<Habit> habits) async {
-    // This is a no-op if home_widget is not set up —
-    // wire in home_widget package calls here once you add it.
-    // Example with home_widget package:
-    //
-    // import 'package:home_widget/home_widget.dart';
-    //
-    // final today = DateTime.now();
-    // final todayHabits = habits.where((h) =>
-    //     h.isScheduledOn(today) && !h.archived).toList();
-    // final completed = todayHabits.where((h) => h.isCompletedOn(today)).length;
-    // final total = todayHabits.length;
-    //
-    // await HomeWidget.saveWidgetData<String>(
-    //   'habits_summary',
-    //   '$completed/$total habits done today',
-    // );
-    // await HomeWidget.saveWidgetData<String>(
-    //   'habit_list',
-    //   todayHabits.map((h) =>
-    //     '${h.isCompletedOn(today) ? '✓' : '○'} ${h.title}').join('\n'),
-    // );
-    // await HomeWidget.updateWidget(
-    //   name: 'HabitWidgetProvider',  // Android AppWidgetProvider class name
-    //   iOSName: 'HabitWidget',       // iOS widget name
-    // );
-  }
+  Future<void> updateWidget(List<Habit> habits) async {}
 }
-
-// ═══════════════════════════════════════════════════════════
-//  THEME
-// ═══════════════════════════════════════════════════════════
 
 enum AppThemeModePreference { light, dark }
 
@@ -651,7 +607,8 @@ class AppStrings {
     'deleteProgressTitle': 'You want to Delete you progress?',
     'cancel': 'Cancel',
     'noArchivedHabits': 'No archived habits yet.',
-    'privacyText': "Your data stays on your device and isn't shared. Feel free to write about your thoughts, daily life, and experiences - darshseraphic",
+    'privacyText':
+        "Your data stays on your device and isn't shared. Feel free to write about your thoughts, daily life, and experiences - darshseraphic",
     'versionClean': 'version - v0.1.0 - Beta',
     'shareSummary': 'Progress summary',
     'themeDescription': 'Choose how the app looks.',
@@ -718,7 +675,8 @@ class AppStrings {
       'delete': 'Eliminar',
       'cancel': 'Cancelar',
       'noArchivedHabits': 'Todavia no hay habitos archivados.',
-      'privacyText': 'Tus datos permanecen en tu dispositivo y no se comparten. Puedes escribir sobre tus pensamientos, tu vida diaria y tus experiencias - darshseraphic',
+      'privacyText':
+          'Tus datos permanecen en tu dispositivo y no se comparten. Puedes escribir sobre tus pensamientos, tu vida diaria y tus experiencias - darshseraphic',
       'shareSummary': 'Resumen del progreso',
       'themeDescription': 'Elige el aspecto de la app.',
       'languageDescription': 'Elige el idioma de la app.',
@@ -782,11 +740,13 @@ class AppStrings {
       'deleteProgressTitle': 'Willst du deinen Fortschritt loschen?',
       'cancel': 'Abbrechen',
       'noArchivedHabits': 'Noch keine archivierten Gewohnheiten.',
-      'privacyText': 'Deine Daten bleiben auf deinem Geraet und werden nicht geteilt. Du kannst frei ueber deine Gedanken, dein taegliches Leben und deine Erfahrungen schreiben - darshseraphic',
+      'privacyText':
+          'Deine Daten bleiben auf deinem Geraet und werden nicht geteilt. Du kannst frei ueber deine Gedanken, dein taegliches Leben und deine Erfahrungen schreiben - darshseraphic',
       'shareSummary': 'Fortschrittsubersicht',
       'themeDescription': 'Wahle das Aussehen der App.',
       'languageDescription': 'Wahle die App-Sprache.',
-      'archiveDescription': 'Archivierte Gewohnheiten wiederherstellen oder loschen.',
+      'archiveDescription':
+          'Archivierte Gewohnheiten wiederherstellen oder loschen.',
       'privacyDescription': 'Sieh, wie deine Daten behandelt werden.',
       'emptyArchiveHint': 'Archivierte Gewohnheiten erscheinen hier.',
     }),
@@ -846,7 +806,8 @@ class AppStrings {
       'deleteProgressTitle': 'Voulez-vous supprimer votre progression ?',
       'cancel': 'Annuler',
       'noArchivedHabits': 'Aucune habitude archivee.',
-      'privacyText': 'Tes donnees restent sur ton appareil et ne sont pas partagees. Tu peux ecrire librement sur tes pensees, ta vie quotidienne et tes experiences - darshseraphic',
+      'privacyText':
+          'Tes donnees restent sur ton appareil et ne sont pas partagees. Tu peux ecrire librement sur tes pensees, ta vie quotidienne et tes experiences - darshseraphic',
       'shareSummary': 'Resume de progression',
       'themeDescription': 'Choisissez l apparence de l application.',
       'languageDescription': 'Choisissez la langue de l application.',
@@ -910,7 +871,8 @@ class AppStrings {
       'deleteProgressTitle': 'Vuoi eliminare i tuoi progressi?',
       'cancel': 'Annulla',
       'noArchivedHabits': 'Nessuna abitudine archiviata.',
-      'privacyText': 'I tuoi dati restano sul tuo dispositivo e non vengono condivisi. Sentiti libero di scrivere pensieri, vita quotidiana ed esperienze - darshseraphic',
+      'privacyText':
+          'I tuoi dati restano sul tuo dispositivo e non vengono condivisi. Sentiti libero di scrivere pensieri, vita quotidiana ed esperienze - darshseraphic',
       'shareSummary': 'Riepilogo progressi',
       'themeDescription': 'Scegli l aspetto dell app.',
       'languageDescription': 'Scegli la lingua dell app.',
@@ -974,7 +936,8 @@ class AppStrings {
       'deleteProgressTitle': 'Voce quer excluir seu progresso?',
       'cancel': 'Cancelar',
       'noArchivedHabits': 'Ainda nao ha habitos arquivados.',
-      'privacyText': 'Seus dados ficam no seu dispositivo e nao sao compartilhados. Escreva livremente sobre pensamentos, vida diaria e experiencias - darshseraphic',
+      'privacyText':
+          'Seus dados ficam no seu dispositivo e nao sao compartilhados. Escreva livremente sobre pensamentos, vida diaria e experiencias - darshseraphic',
       'shareSummary': 'Resumo do progresso',
       'themeDescription': 'Escolha a aparencia do app.',
       'languageDescription': 'Escolha o idioma do app.',
@@ -1651,28 +1614,314 @@ class AppStrings {
   };
 
   static final Map<String, List<String>> _monthLabels = {
-    'en': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-    'es': ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
-    'de': ['Jan', 'Feb', 'Mar', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
-    'fr': ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aou', 'Sep', 'Oct', 'Nov', 'Dec'],
-    'it': ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'],
-    'pt': ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-    'hu': ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sze', 'Okt', 'Nov', 'Dec'],
-    'ro': ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Noi', 'Dec'],
-    'tr': ['Oca', 'Sub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Agu', 'Eyl', 'Eki', 'Kas', 'Ara'],
-    'ru': ['Yan', 'Fev', 'Mar', 'Apr', 'Mai', 'Iyn', 'Iyl', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'],
-    'uk': ['Sic', 'Lyu', 'Ber', 'Kvi', 'Tra', 'Che', 'Lyp', 'Ser', 'Ver', 'Zho', 'Lys', 'Gru'],
-    'zh': ['1Y', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '9Y', '10Y', '11Y', '12Y'],
-    'ja': ['1Ga', '2Ga', '3Ga', '4Ga', '5Ga', '6Ga', '7Ga', '8Ga', '9Ga', '10Ga', '11Ga', '12Ga'],
-    'ko': ['1W', '2W', '3W', '4W', '5W', '6W', '7W', '8W', '9W', '10W', '11W', '12W'],
-    'vi': ['Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'],
-    'ar': ['Yan', 'Feb', 'Mar', 'Abr', 'Mai', 'Yun', 'Yul', 'Agh', 'Seb', 'Okt', 'Nov', 'Dis'],
-    'id': ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
-    'th': ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'],
-    'hi': ['जन', 'फर', 'मार', 'अप्र', 'मई', 'जून', 'जुल', 'अग', 'सित', 'अक्ट', 'नव', 'दिस'],
-    'nl': ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'],
-    'pl': ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'],
-    'sv': ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'],
+    'en': [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ],
+    'es': [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic'
+    ],
+    'de': [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Dez'
+    ],
+    'fr': [
+      'Jan',
+      'Fev',
+      'Mar',
+      'Avr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Aou',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ],
+    'it': [
+      'Gen',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mag',
+      'Giu',
+      'Lug',
+      'Ago',
+      'Set',
+      'Ott',
+      'Nov',
+      'Dic'
+    ],
+    'pt': [
+      'Jan',
+      'Fev',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Set',
+      'Out',
+      'Nov',
+      'Dez'
+    ],
+    'hu': [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Maj',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sze',
+      'Okt',
+      'Nov',
+      'Dec'
+    ],
+    'ro': [
+      'Ian',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mai',
+      'Iun',
+      'Iul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Noi',
+      'Dec'
+    ],
+    'tr': [
+      'Oca',
+      'Sub',
+      'Mar',
+      'Nis',
+      'May',
+      'Haz',
+      'Tem',
+      'Agu',
+      'Eyl',
+      'Eki',
+      'Kas',
+      'Ara'
+    ],
+    'ru': [
+      'Yan',
+      'Fev',
+      'Mar',
+      'Apr',
+      'Mai',
+      'Iyn',
+      'Iyl',
+      'Avg',
+      'Sen',
+      'Okt',
+      'Noy',
+      'Dek'
+    ],
+    'uk': [
+      'Sic',
+      'Lyu',
+      'Ber',
+      'Kvi',
+      'Tra',
+      'Che',
+      'Lyp',
+      'Ser',
+      'Ver',
+      'Zho',
+      'Lys',
+      'Gru'
+    ],
+    'zh': [
+      '1Y',
+      '2Y',
+      '3Y',
+      '4Y',
+      '5Y',
+      '6Y',
+      '7Y',
+      '8Y',
+      '9Y',
+      '10Y',
+      '11Y',
+      '12Y'
+    ],
+    'ja': [
+      '1Ga',
+      '2Ga',
+      '3Ga',
+      '4Ga',
+      '5Ga',
+      '6Ga',
+      '7Ga',
+      '8Ga',
+      '9Ga',
+      '10Ga',
+      '11Ga',
+      '12Ga'
+    ],
+    'ko': [
+      '1W',
+      '2W',
+      '3W',
+      '4W',
+      '5W',
+      '6W',
+      '7W',
+      '8W',
+      '9W',
+      '10W',
+      '11W',
+      '12W'
+    ],
+    'vi': [
+      'Th1',
+      'Th2',
+      'Th3',
+      'Th4',
+      'Th5',
+      'Th6',
+      'Th7',
+      'Th8',
+      'Th9',
+      'Th10',
+      'Th11',
+      'Th12'
+    ],
+    'ar': [
+      'Yan',
+      'Feb',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Yun',
+      'Yul',
+      'Agh',
+      'Seb',
+      'Okt',
+      'Nov',
+      'Dis'
+    ],
+    'id': [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des'
+    ],
+    'th': [
+      'ม.ค.',
+      'ก.พ.',
+      'มี.ค.',
+      'เม.ย.',
+      'พ.ค.',
+      'มิ.ย.',
+      'ก.ค.',
+      'ส.ค.',
+      'ก.ย.',
+      'ต.ค.',
+      'พ.ย.',
+      'ธ.ค.'
+    ],
+    'hi': [
+      'जन',
+      'फर',
+      'मार',
+      'अप्र',
+      'मई',
+      'जून',
+      'जुल',
+      'अग',
+      'सित',
+      'अक्ट',
+      'नव',
+      'दिस'
+    ],
+    'nl': [
+      'Jan',
+      'Feb',
+      'Mrt',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Dec'
+    ],
+    'pl': [
+      'Sty',
+      'Lut',
+      'Mar',
+      'Kwi',
+      'Maj',
+      'Cze',
+      'Lip',
+      'Sie',
+      'Wrz',
+      'Paź',
+      'Lis',
+      'Gru'
+    ],
+    'sv': [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Maj',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Dec'
+    ],
   };
 
   static final Map<String, List<String>> _weekdayLabels = {
@@ -1701,9 +1950,9 @@ class AppStrings {
   };
 
   static Map<String, String> _merge(
-      Map<String, String> base,
-      Map<String, String> values,
-      ) =>
+    Map<String, String> base,
+    Map<String, String> values,
+  ) =>
       {...base, ...values};
 
   static String text(String code, String key) {
@@ -1723,72 +1972,67 @@ class AppTheme {
   static bool get isDark => mode == AppThemeModePreference.dark;
 
   static Color get bg => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFFFFFFF),
-    AppThemeModePreference.dark => const Color(0xFF0A0A0A),
-  };
+        AppThemeModePreference.light => const Color(0xFFFFFFFF),
+        AppThemeModePreference.dark => const Color(0xFF0A0A0A),
+      };
   static Color get surface => switch (mode) {
-    AppThemeModePreference.light => Colors.white,
-    AppThemeModePreference.dark => const Color(0xFF141414),
-  };
+        AppThemeModePreference.light => Colors.white,
+        AppThemeModePreference.dark => const Color(0xFF141414),
+      };
   static Color get border => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFF0D0D0D),
-    AppThemeModePreference.dark => const Color(0xFF2A2A2A),
-  };
+        AppThemeModePreference.light => const Color(0xFF0D0D0D),
+        AppThemeModePreference.dark => const Color(0xFF2A2A2A),
+      };
   static Color get borderLight => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFE7E2E9),
-    AppThemeModePreference.dark => const Color(0xFF1E1E1E),
-  };
+        AppThemeModePreference.light => const Color(0xFFE7E2E9),
+        AppThemeModePreference.dark => const Color(0xFF1E1E1E),
+      };
   static Color get textPrimary => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFF16151A),
-    AppThemeModePreference.dark => const Color(0xFFF4F3F7),
-  };
+        AppThemeModePreference.light => const Color(0xFF16151A),
+        AppThemeModePreference.dark => const Color(0xFFF4F3F7),
+      };
   static Color get textSecondary => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFF6D6770),
-    AppThemeModePreference.dark => const Color(0xFFAEAAB6),
-  };
+        AppThemeModePreference.light => const Color(0xFF6D6770),
+        AppThemeModePreference.dark => const Color(0xFFAEAAB6),
+      };
   static Color get textTertiary => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFB2ACB4),
-    AppThemeModePreference.dark => const Color(0xFF73707A),
-  };
-  // Card surface: blends with #0A0A0A bg in dark
+        AppThemeModePreference.light => const Color(0xFFB2ACB4),
+        AppThemeModePreference.dark => const Color(0xFF73707A),
+      };
   static Color get cardSurface => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFFAFAFA),
-    AppThemeModePreference.dark => const Color(0xFF111111),
-  };
-  // Card border: gray in light, #121212 in dark
+        AppThemeModePreference.light => const Color(0xFFFAFAFA),
+        AppThemeModePreference.dark => const Color(0xFF111111),
+      };
   static Color get cardBorder => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFc7c7c7),
-    AppThemeModePreference.dark => const Color(0xFF1F1F1F),
-  };
-  // Upcoming (future) day color
+        AppThemeModePreference.light => const Color(0xFFc7c7c7),
+        AppThemeModePreference.dark => const Color(0xFF1F1F1F),
+      };
   static Color get upcomingDot => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFCACACA),
-    AppThemeModePreference.dark => const Color(0xFF222222),
-  };
-  // Inactive (not scheduled) day
+        AppThemeModePreference.light => const Color(0xFFCACACA),
+        AppThemeModePreference.dark => const Color(0xFF222222),
+      };
   static Color get inactiveDot => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFEEEEEE),
-    AppThemeModePreference.dark => const Color(0xFF666666),
-  };
-  // Done dot color
+        AppThemeModePreference.light => const Color(0xFFEEEEEE),
+        AppThemeModePreference.dark => const Color(0xFF666666),
+      };
+
   static Color get doneDot => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFF111111),
-    AppThemeModePreference.dark => const Color(0xFFFFFFFF),
-  };
+        AppThemeModePreference.light => const Color(0xFF111111),
+        AppThemeModePreference.dark => const Color(0xFFFFFFFF),
+      };
 
   static Color get done => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFF141318),
-    AppThemeModePreference.dark => const Color(0xFFF3F2F7),
-  };
+        AppThemeModePreference.light => const Color(0xFF141318),
+        AppThemeModePreference.dark => const Color(0xFFF3F2F7),
+      };
   static Color get gray => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFF2EEF4),
-    AppThemeModePreference.dark => const Color(0xFF2A2A31),
-  };
-  // Faint border for icon circles inside cards
+        AppThemeModePreference.light => const Color(0xFFF2EEF4),
+        AppThemeModePreference.dark => const Color(0xFF2A2A31),
+      };
   static Color get faintBorder => switch (mode) {
-    AppThemeModePreference.light => const Color(0xFFE8E4E6),
-    AppThemeModePreference.dark => const Color(0xFF252525),
-  };
+        AppThemeModePreference.light => const Color(0xFFE8E4E6),
+        AppThemeModePreference.dark => const Color(0xFF252525),
+      };
   static Color get navActive => textPrimary;
   static Color get navInactive => textTertiary;
   static Color get divider => borderLight;
@@ -1797,13 +2041,13 @@ class AppTheme {
   static ThemeData themeData({required bool dark}) {
     final scheme = dark
         ? ColorScheme.dark(
-      primary: textPrimary,
-      surface: surface,
-    )
+            primary: textPrimary,
+            surface: surface,
+          )
         : ColorScheme.light(
-      primary: textPrimary,
-      surface: surface,
-    );
+            primary: textPrimary,
+            surface: surface,
+          );
     return ThemeData(
       useMaterial3: false,
       brightness: dark ? Brightness.dark : Brightness.light,
@@ -1822,14 +2066,10 @@ class AppTheme {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  MODELS
-// ═══════════════════════════════════════════════════════════
-
 enum StreakType { daily, weekly }
 
 class HabitReminder {
-  final Set<int> days; // 0=Mon..6=Sun
+  final Set<int> days;
   final TimeOfDay time;
   HabitReminder({required this.days, required this.time});
 
@@ -1837,9 +2077,9 @@ class HabitReminder {
       {'days': days.toList(), 'hour': time.hour, 'minute': time.minute};
 
   factory HabitReminder.fromJson(Map<String, dynamic> j) => HabitReminder(
-    days: Set<int>.from(j['days'] as List),
-    time: TimeOfDay(hour: j['hour'] as int, minute: j['minute'] as int),
-  );
+        days: Set<int>.from(j['days'] as List),
+        time: TimeOfDay(hour: j['hour'] as int, minute: j['minute'] as int),
+      );
 }
 
 class Habit {
@@ -1871,7 +2111,6 @@ class Habit {
     Map<String, int>? completions,
   }) : completions = completions ?? {};
 
-
   IconData get iconData => _iconFromCP(iconCodePoint);
 
   static String dateKey(DateTime d) =>
@@ -1891,7 +2130,10 @@ class Habit {
     for (int i = 0; i < 400; i++) {
       final d = now.subtract(Duration(days: i));
       if (!isScheduledOn(d)) continue;
-      if (isCompletedOn(d)) s++; else break;
+      if (isCompletedOn(d))
+        s++;
+      else
+        break;
     }
     return s;
   }
@@ -1901,7 +2143,8 @@ class Habit {
     final dates = completions.entries
         .where((e) => e.value >= completionsPerDay)
         .map((e) => DateTime.parse(e.key))
-        .toList()..sort();
+        .toList()
+      ..sort();
     int best = 0, cur = 0;
     DateTime? prev;
     for (final d in dates) {
@@ -1922,9 +2165,15 @@ class Habit {
       for (int i = 0; i < 7; i++) {
         final d = mon.add(Duration(days: i));
         if (d.isAfter(now)) continue;
-        if (isCompletedOn(d)) { any = true; break; }
+        if (isCompletedOn(d)) {
+          any = true;
+          break;
+        }
       }
-      if (any) s++; else break;
+      if (any)
+        s++;
+      else
+        break;
     }
     return s;
   }
@@ -1934,7 +2183,8 @@ class Habit {
     final dates = completions.entries
         .where((e) => e.value >= completionsPerDay)
         .map((e) => DateTime.parse(e.key))
-        .toList()..sort();
+        .toList()
+      ..sort();
     Set<int> weeks = {};
     for (final d in dates) {
       final mon = d.subtract(Duration(days: d.weekday - 1));
@@ -1958,55 +2208,60 @@ class Habit {
 
   double completionRateInYear(int year) {
     final start = DateTime(year, 1, 1);
-    final end = year == DateTime.now().year ? DateTime.now() : DateTime(year, 12, 31);
+    final end =
+        year == DateTime.now().year ? DateTime.now() : DateTime(year, 12, 31);
     int scheduled = 0, done = 0;
-    for (DateTime d = start; !d.isAfter(end); d = d.add(const Duration(days: 1))) {
-      if (isScheduledOn(d)) { scheduled++; if (isCompletedOn(d)) done++; }
+    for (DateTime d = start;
+        !d.isAfter(end);
+        d = d.add(const Duration(days: 1))) {
+      if (isScheduledOn(d)) {
+        scheduled++;
+        if (isCompletedOn(d)) done++;
+      }
     }
     return scheduled == 0 ? 0 : done / scheduled;
   }
 
   List<int> monthlyCompletions(int year) => List.generate(12, (m) {
-    final prefix = '$year-${(m + 1).toString().padLeft(2, '0')}';
-    return completions.entries
-        .where((e) => e.value >= completionsPerDay && e.key.startsWith(prefix))
-        .length;
-  });
+        final prefix = '$year-${(m + 1).toString().padLeft(2, '0')}';
+        return completions.entries
+            .where(
+                (e) => e.value >= completionsPerDay && e.key.startsWith(prefix))
+            .length;
+      });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'description': description,
-    'iconCodePoint': iconCodePoint,
-    'category': category,
-    'completionsPerDay': completionsPerDay,
-    'reminder': reminder.toJson(),
-    'streakType': streakType.index,
-    'showStreak': showStreak,
-    'archived': archived,
-    'notificationEnabled': notificationEnabled,
-    'completions': completions,
-  };
+        'id': id,
+        'title': title,
+        'description': description,
+        'iconCodePoint': iconCodePoint,
+        'category': category,
+        'completionsPerDay': completionsPerDay,
+        'reminder': reminder.toJson(),
+        'streakType': streakType.index,
+        'showStreak': showStreak,
+        'archived': archived,
+        'notificationEnabled': notificationEnabled,
+        'completions': completions,
+      };
 
   factory Habit.fromJson(Map<String, dynamic> j) => Habit(
-    id: j['id'] as String,
-    title: j['title'] as String,
-    description: j['description'] as String? ?? '',
-    iconCodePoint: j['iconCodePoint'] as int? ?? kDefaultHabitIcon.codePoint,
-    category: j['category'] as String? ?? '',
-    completionsPerDay: j['completionsPerDay'] as int? ?? 1,
-    reminder: HabitReminder.fromJson(Map<String, dynamic>.from(j['reminder'] as Map)),
-    streakType: StreakType.values[j['streakType'] as int? ?? 0],
-    showStreak: j['showStreak'] as bool? ?? true,
-    archived: j['archived'] as bool? ?? false,
-    notificationEnabled: j['notificationEnabled'] as bool? ?? false,
-    completions: Map<String, int>.from(j['completions'] as Map? ?? {}),
-  );
+        id: j['id'] as String,
+        title: j['title'] as String,
+        description: j['description'] as String? ?? '',
+        iconCodePoint:
+            j['iconCodePoint'] as int? ?? kDefaultHabitIcon.codePoint,
+        category: j['category'] as String? ?? '',
+        completionsPerDay: j['completionsPerDay'] as int? ?? 1,
+        reminder: HabitReminder.fromJson(
+            Map<String, dynamic>.from(j['reminder'] as Map)),
+        streakType: StreakType.values[j['streakType'] as int? ?? 0],
+        showStreak: j['showStreak'] as bool? ?? true,
+        archived: j['archived'] as bool? ?? false,
+        notificationEnabled: j['notificationEnabled'] as bool? ?? false,
+        completions: Map<String, int>.from(j['completions'] as Map? ?? {}),
+      );
 }
-
-// ═══════════════════════════════════════════════════════════
-//  STORE
-// ═══════════════════════════════════════════════════════════
 
 class HabitStore extends ChangeNotifier {
   final List<Habit> _habits = [];
@@ -2019,7 +2274,6 @@ class HabitStore extends ChangeNotifier {
   List<Habit> get archivedHabits => _habits.where((h) => h.archived).toList();
   String text(String key) => AppStrings.text(languageCode, key);
 
-  /// Returns a File in the user's home / documents folder.
   static Future<File> _storageFile() async {
     final home = Platform.environment['USERPROFILE'] ??
         Platform.environment['HOME'] ??
@@ -2041,32 +2295,34 @@ class HabitStore extends ChangeNotifier {
         final decoded = jsonDecode(raw);
         if (decoded is List) {
           _habits.addAll(
-            decoded.map((e) => Habit.fromJson(Map<String, dynamic>.from(e as Map))),
+            decoded.map(
+                (e) => Habit.fromJson(Map<String, dynamic>.from(e as Map))),
           );
         } else if (decoded is Map) {
-          final settings = Map<String, dynamic>.from(decoded['settings'] as Map? ?? {});
+          final settings =
+              Map<String, dynamic>.from(decoded['settings'] as Map? ?? {});
           final themeName = settings['theme'] as String? ?? 'light';
           themePreference = AppThemeModePreference.values.firstWhere(
-                (value) => value.name == themeName,
+            (value) => value.name == themeName,
             orElse: () => AppThemeModePreference.light,
           );
           languageCode = settings['languageCode'] as String? ?? 'en';
-          notificationsEnabled = settings['notificationsEnabled'] as bool? ?? false;
+          notificationsEnabled =
+              settings['notificationsEnabled'] as bool? ?? false;
 
           final habitsRaw = decoded['habits'] as List? ?? const [];
           _habits.addAll(
-            habitsRaw.map((e) => Habit.fromJson(Map<String, dynamic>.from(e as Map))),
+            habitsRaw.map(
+                (e) => Habit.fromJson(Map<String, dynamic>.from(e as Map))),
           );
         }
         AppTheme.mode = themePreference;
         notifyListeners();
-        // Restore any scheduled notifications after app restart
         if (notificationsEnabled) {
           NotificationService.instance.rescheduleAll(_habits);
         }
       }
     } catch (e) {
-      // Back up corrupt file rather than silently wiping data
       try {
         final file = await _storageFile();
         if (await file.exists()) {
@@ -2127,13 +2383,15 @@ class HabitStore extends ChangeNotifier {
   }
 
   void toggleComplete(Habit h, DateTime date) {
-    // Only allow toggling today — past and future days are locked
     if (!h.isScheduledOn(date) || !_isSameDate(date, DateTime.now())) return;
     final key = Habit.dateKey(date);
     final cur = h.completions[key] ?? 0;
-    if (cur >= h.completionsPerDay) h.completions.remove(key);
-    else h.completions[key] = cur + 1;
-    notifyListeners(); _save();
+    if (cur >= h.completionsPerDay)
+      h.completions.remove(key);
+    else
+      h.completions[key] = cur + 1;
+    notifyListeners();
+    _save();
   }
 
   void archiveHabit(String id) {
@@ -2167,7 +2425,6 @@ class HabitStore extends ChangeNotifier {
     _save();
   }
 
-
   void updateThemePreference(AppThemeModePreference value) {
     themePreference = value;
     AppTheme.mode = value;
@@ -2196,13 +2453,8 @@ class HabitStore extends ChangeNotifier {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  ENTRY POINT
-// ═══════════════════════════════════════════════════════════
-
 final _globalStore = HabitStore();
 
-// Constrains content to max 680px on wide screens, centered
 class _ResponsiveWrapper extends StatelessWidget {
   final Widget child;
   final double maxWidth;
@@ -2223,7 +2475,7 @@ class _ResponsiveWrapper extends StatelessWidget {
 class _NoGlowScrollBehavior extends ScrollBehavior {
   @override
   Widget buildOverscrollIndicator(
-      BuildContext context, Widget child, ScrollableDetails details) =>
+          BuildContext context, Widget child, ScrollableDetails details) =>
       child;
 }
 
@@ -2251,10 +2503,6 @@ class HabitApp extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════
-//  APP ROOT - Entry Point with Initial Data Load
-// ═══════════════════════════════════════════════════════════
 
 class _AppRoot extends StatefulWidget {
   final HabitStore store;
@@ -2287,7 +2535,8 @@ class _AppRootState extends State<_AppRoot> {
 
   Directory _appDir() {
     final home = Platform.environment['USERPROFILE'] ??
-        Platform.environment['HOME'] ?? Directory.systemTemp.path;
+        Platform.environment['HOME'] ??
+        Directory.systemTemp.path;
     return Platform.isAndroid
         ? Directory('/data/data/com.example.doingnow/files/.doingnow')
         : Directory('$home/.doingnow');
@@ -2301,7 +2550,8 @@ class _AppRootState extends State<_AppRoot> {
 
   Future<void> _initData() async {
     await widget.store.load();
-    final flagFile = File('${(await _settingsFile()).parent.path}/onboarded.flag');
+    final flagFile =
+        File('${(await _settingsFile()).parent.path}/onboarded.flag');
     final onboarded = flagFile.existsSync();
     if (!mounted) return;
     setState(() {
@@ -2402,7 +2652,8 @@ class _SplashTransition extends StatefulWidget {
 //  SPLASH TRANSITION - The Logic and UI
 // ═══════════════════════════════════════════════════════════
 
-class _SplashTransitionState extends State<_SplashTransition> with TickerProviderStateMixin {
+class _SplashTransitionState extends State<_SplashTransition>
+    with TickerProviderStateMixin {
   late final AnimationController _logoCtrl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 800),
@@ -2591,7 +2842,9 @@ class _SplashTransitionState extends State<_SplashTransition> with TickerProvide
                             style: TextStyle(
                               color: AppTheme.textPrimary.withOpacity(0.4),
                               fontSize: 12,
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
                             ),
                           ),
                         ],
@@ -2614,8 +2867,10 @@ class _SplashTransitionState extends State<_SplashTransition> with TickerProvide
                       'assets/icon.png',
                       width: 80,
                       height: 80,
-                      errorBuilder: (context, error, stackTrace) =>
-                          Icon(Icons.auto_graph, size: 50, color: AppTheme.textPrimary),
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.auto_graph,
+                          size: 50,
+                          color: AppTheme.textPrimary),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -2645,33 +2900,31 @@ class _SlideRoute<T> extends PageRouteBuilder<T> {
   final Widget child;
   _SlideRoute({required this.child})
       : super(
-    pageBuilder: (_, __, ___) => child,
-    transitionDuration: const Duration(milliseconds: 300),
-    reverseTransitionDuration: const Duration(milliseconds: 300),
-    transitionsBuilder: (_, animation, secondaryAnimation, child) {
-      final slide = Tween<Offset>(
-        begin: const Offset(1.0, 0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-      ));
-      final fadeOut = Tween<Offset>(
-        begin: Offset.zero,
-        end: const Offset(-0.3, 0),
-      ).animate(CurvedAnimation(
-        parent: secondaryAnimation,
-        curve: Curves.easeInCubic,
-      ));
-      return SlideTransition(
-        position: fadeOut,
-        child: SlideTransition(position: slide, child: child),
-      );
-    },
-  );
+          pageBuilder: (_, __, ___) => child,
+          transitionDuration: const Duration(milliseconds: 300),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (_, animation, secondaryAnimation, child) {
+            final slide = Tween<Offset>(
+              begin: const Offset(1.0, 0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ));
+            final fadeOut = Tween<Offset>(
+              begin: Offset.zero,
+              end: const Offset(-0.3, 0),
+            ).animate(CurvedAnimation(
+              parent: secondaryAnimation,
+              curve: Curves.easeInCubic,
+            ));
+            return SlideTransition(
+              position: fadeOut,
+              child: SlideTransition(position: slide, child: child),
+            );
+          },
+        );
 }
-
-
 
 class HomeScreen extends StatefulWidget {
   final HabitStore store;
@@ -2689,12 +2942,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Key _yearKey = UniqueKey();
 
   late final List<Widget> Function() _buildPages = () => [
-    MonthTab(store: widget.store),
-    WeekTab(store: widget.store),
-    YearTab(store: widget.store, key: _yearKey),
-    StatisticsTab(store: widget.store, key: _statsKey),
-    SettingsTab(store: widget.store),
-  ];
+        MonthTab(store: widget.store),
+        WeekTab(store: widget.store),
+        YearTab(store: widget.store, key: _yearKey),
+        StatisticsTab(store: widget.store, key: _statsKey),
+        SettingsTab(store: widget.store),
+      ];
 
   late List<Widget> _pages = _buildPages();
 
@@ -2769,8 +3022,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () => _onTabTap(i),
                   behavior: HitTestBehavior.opaque,
                   child: Center(
-                    child: Icon(icons[i], size: 22,
-                        color: active ? AppTheme.navActive : AppTheme.navInactive),
+                    child: Icon(icons[i],
+                        size: 22,
+                        color:
+                            active ? AppTheme.navActive : AppTheme.navInactive),
                   ),
                 ),
               );
@@ -2805,42 +3060,62 @@ class MonthTab extends StatelessWidget {
         return Scaffold(
           backgroundColor: AppTheme.bg,
           body: SafeArea(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _ResponsiveWrapper(
-                child: _TabHeader(title: store.text('month'), onAdd: () => showCreateDialog(context, store)),
+                child: _TabHeader(
+                    title: store.text('month'),
+                    onAdd: () => showCreateDialog(context, store)),
               ),
               Expanded(
                 child: store.habits.isEmpty
-                    ? Center(child: Text(
-                    '${store.text('noHabitsYet')}\n${store.text('tapPlusCreate')}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 14, height: 1.6)))
+                    ? Center(
+                        child: Text(
+                            '${store.text('noHabitsYet')}\n${store.text('tapPlusCreate')}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 14,
+                                height: 1.6)))
                     : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final cols = _crossAxisCount(constraints.maxWidth);
-                    if (cols == 1) {
-                      return ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        itemCount: store.habits.length,
-                        itemBuilder: (_, i) => RepaintBoundary(
-                          child: _MonthCard(habit: store.habits[i], store: store, now: now),
-                        ),
-                      );
-                    }
-                    return GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: cols,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: cols >= 5 ? 0.75 : cols >= 3 ? 0.85 : 0.9,
+                        builder: (context, constraints) {
+                          final cols = _crossAxisCount(constraints.maxWidth);
+                          if (cols == 1) {
+                            return ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              itemCount: store.habits.length,
+                              itemBuilder: (_, i) => RepaintBoundary(
+                                child: _MonthCard(
+                                    habit: store.habits[i],
+                                    store: store,
+                                    now: now),
+                              ),
+                            );
+                          }
+                          return GridView.builder(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 6),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: cols,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                              childAspectRatio: cols >= 5
+                                  ? 0.75
+                                  : cols >= 3
+                                      ? 0.85
+                                      : 0.9,
+                            ),
+                            itemCount: store.habits.length,
+                            itemBuilder: (_, i) => RepaintBoundary(
+                                child: _MonthCard(
+                                    habit: store.habits[i],
+                                    store: store,
+                                    now: now)),
+                          );
+                        },
                       ),
-                      itemCount: store.habits.length,
-                      itemBuilder: (_, i) =>
-                          RepaintBoundary(child: _MonthCard(habit: store.habits[i], store: store, now: now)),
-                    );
-                  },
-                ),
               ),
             ]),
           ),
@@ -2854,7 +3129,8 @@ class _MonthCard extends StatelessWidget {
   final Habit habit;
   final HabitStore store;
   final DateTime now;
-  const _MonthCard({required this.habit, required this.store, required this.now});
+  const _MonthCard(
+      {required this.habit, required this.store, required this.now});
 
   @override
   Widget build(BuildContext context) {
@@ -2865,15 +3141,18 @@ class _MonthCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8), // Slightly rounded out the padding for better balance
+      padding: const EdgeInsets.fromLTRB(
+          10, 8, 10, 8), // Slightly rounded out the padding for better balance
       decoration: BoxDecoration(
         color: AppTheme.cardSurface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.cardBorder, width: 1.0),
       ),
       child: Column(
-          mainAxisSize: MainAxisSize.max, // Let the column fill the GridView cell height
-          mainAxisAlignment: MainAxisAlignment.spaceBetween, // Push header up and calendar down
+          mainAxisSize:
+              MainAxisSize.max, // Let the column fill the GridView cell height
+          mainAxisAlignment: MainAxisAlignment
+              .spaceBetween, // Push header up and calendar down
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // HEADER GROUP
@@ -2885,24 +3164,34 @@ class _MonthCard extends StatelessWidget {
                   color: AppTheme.bg,
                   border: Border.all(color: AppTheme.faintBorder),
                 ),
-                child: Center(child: Icon(habit.iconData, size: 14, color: AppTheme.textPrimary)),
+                child: Center(
+                    child: Icon(habit.iconData,
+                        size: 14, color: AppTheme.textPrimary)),
               ),
               const SizedBox(width: 8),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(habit.title,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                if (habit.description.isNotEmpty)
-                  Text(habit.description,
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 9),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-              ])),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(habit.title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    if (habit.description.isNotEmpty)
+                      Text(habit.description,
+                          style: TextStyle(
+                              color: AppTheme.textSecondary, fontSize: 9),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                  ])),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => showHabitActions(context, habit, store),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
-                  child: Icon(Icons.more_horiz, color: AppTheme.textTertiary, size: 20),
+                  child: Icon(Icons.more_horiz,
+                      color: AppTheme.textTertiary, size: 20),
                 ),
               ),
             ]),
@@ -2911,11 +3200,17 @@ class _MonthCard extends StatelessWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(children: _weekdayLabels(context).map((d) => Expanded(
-                  child: Text(d, textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 9, color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w500)),
-                )).toList()),
+                Row(
+                    children: _weekdayLabels(context)
+                        .map((d) => Expanded(
+                              child: Text(d,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      color: AppTheme.textSecondary,
+                                      fontWeight: FontWeight.w500)),
+                            ))
+                        .toList()),
                 const SizedBox(height: 4),
                 GridView.builder(
                   shrinkWrap: true,
@@ -2939,15 +3234,20 @@ class _MonthCard extends StatelessWidget {
                     final isFuture = _isFutureDate(date);
                     final isPast = _isPastDate(date);
                     _CT type;
-                    if (!sched) type = _CT.gray;
-                    else if (isFuture) type = _CT.empty;
-                    else if (done) type = _CT.done;
-                    else type = _CT.undone;
+                    if (!sched)
+                      type = _CT.gray;
+                    else if (isFuture)
+                      type = _CT.empty;
+                    else if (done)
+                      type = _CT.done;
+                    else
+                      type = _CT.undone;
 
                     return GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: isToday
-                          ? () => _handleHabitDayTap(context, store, habit, date)
+                          ? () =>
+                              _handleHabitDayTap(context, store, habit, date)
                           : null,
                       child: Opacity(
                         opacity: isPast && sched ? 0.55 : 1.0,
@@ -2981,21 +3281,32 @@ class WeekTab extends StatelessWidget {
           backgroundColor: AppTheme.bg,
           body: SafeArea(
             child: _ResponsiveWrapper(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _TabHeader(title: store.text('week'), onAdd: () => showCreateDialog(context, store)),
-                Expanded(
-                  child: store.habits.isEmpty
-                      ? Center(child: Text(store.text('noHabitsYet'),
-                      style: TextStyle(color: AppTheme.textSecondary)))
-                      : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    itemCount: store.habits.length,
-                    itemBuilder: (_, i) => RepaintBoundary(
-                      child: _WeekCard(habit: store.habits[i], store: store, monday: monday, now: now),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TabHeader(
+                        title: store.text('week'),
+                        onAdd: () => showCreateDialog(context, store)),
+                    Expanded(
+                      child: store.habits.isEmpty
+                          ? Center(
+                              child: Text(store.text('noHabitsYet'),
+                                  style:
+                                      TextStyle(color: AppTheme.textSecondary)))
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              itemCount: store.habits.length,
+                              itemBuilder: (_, i) => RepaintBoundary(
+                                child: _WeekCard(
+                                    habit: store.habits[i],
+                                    store: store,
+                                    monday: monday,
+                                    now: now),
+                              ),
+                            ),
                     ),
-                  ),
-                ),
-              ]),
+                  ]),
             ),
           ),
         );
@@ -3009,8 +3320,10 @@ class _WeekCard extends StatelessWidget {
   final HabitStore store;
   final DateTime monday, now;
   const _WeekCard(
-      {required this.habit, required this.store,
-        required this.monday, required this.now});
+      {required this.habit,
+      required this.store,
+      required this.monday,
+      required this.now});
 
   @override
   Widget build(BuildContext context) {
@@ -3025,29 +3338,37 @@ class _WeekCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
-            width: 24, height: 24,
+            width: 24,
+            height: 24,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppTheme.bg,
               border: Border.all(color: AppTheme.faintBorder),
             ),
-            child: Center(child: Icon(habit.iconData, size: 12, color: AppTheme.textPrimary)),
+            child: Center(
+                child: Icon(habit.iconData,
+                    size: 12, color: AppTheme.textPrimary)),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(habit.title,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-              maxLines: 1, overflow: TextOverflow.ellipsis)),
+          Expanded(
+              child: Text(habit.title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 14),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis)),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => showHabitActions(context, habit, store),
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: Icon(Icons.more_horiz, color: AppTheme.textTertiary, size: 15),
+              child: Icon(Icons.more_horiz,
+                  color: AppTheme.textTertiary, size: 15),
             ),
           ),
         ]),
         const SizedBox(height: 10),
-        Row(children: List.generate(7, (i) {
+        Row(
+            children: List.generate(7, (i) {
           final date = monday.add(Duration(days: i));
           final sched = habit.isScheduledOn(date);
           final done = habit.isCompletedOn(date);
@@ -3056,11 +3377,16 @@ class _WeekCard extends StatelessWidget {
           final isOtherMonth = date.month != now.month;
           final isPast = _isPastDate(date);
           _CT type;
-          if (isOtherMonth) type = _CT.gray;
-          else if (!sched) type = _CT.gray;
-          else if (isFuture) type = _CT.empty;
-          else if (done) type = _CT.done;
-          else type = _CT.undone;
+          if (isOtherMonth)
+            type = _CT.gray;
+          else if (!sched)
+            type = _CT.gray;
+          else if (isFuture)
+            type = _CT.empty;
+          else if (done)
+            type = _CT.done;
+          else
+            type = _CT.undone;
           return Expanded(
             child: Column(children: [
               Text(
@@ -3081,7 +3407,9 @@ class _WeekCard extends StatelessWidget {
                     : () => _handleHabitDayTap(context, store, habit, date),
                 child: SizedBox(
                   height: 26,
-                  child: Center(child: _CircleDayDot(type: type, isToday: isToday, size: 22)),
+                  child: Center(
+                      child: _CircleDayDot(
+                          type: type, isToday: isToday, size: 22)),
                 ),
               ),
             ]),
@@ -3109,21 +3437,29 @@ class YearTab extends StatelessWidget {
           backgroundColor: AppTheme.bg,
           body: SafeArea(
             child: _ResponsiveWrapper(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _TabHeader(title: store.text('year'), onAdd: () => showCreateDialog(context, store)),
-                Expanded(
-                  child: store.habits.isEmpty
-                      ? Center(child: Text(store.text('noHabitsYet'),
-                      style: TextStyle(color: AppTheme.textSecondary)))
-                      : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    itemCount: store.habits.length,
-                    itemBuilder: (_, i) => RepaintBoundary(
-                      child: _YearCard(habit: store.habits[i], store: store),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TabHeader(
+                        title: store.text('year'),
+                        onAdd: () => showCreateDialog(context, store)),
+                    Expanded(
+                      child: store.habits.isEmpty
+                          ? Center(
+                              child: Text(store.text('noHabitsYet'),
+                                  style:
+                                      TextStyle(color: AppTheme.textSecondary)))
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 6),
+                              itemCount: store.habits.length,
+                              itemBuilder: (_, i) => RepaintBoundary(
+                                child: _YearCard(
+                                    habit: store.habits[i], store: store),
+                              ),
+                            ),
                     ),
-                  ),
-                ),
-              ]),
+                  ]),
             ),
           ),
         );
@@ -3143,9 +3479,11 @@ class _YearCard extends StatelessWidget {
     final year = now.year;
     final allDays = List.generate(
       DateTime(year, 12, 31).difference(DateTime(year, 1, 1)).inDays + 1,
-          (i) => DateTime(year, 1, 1).add(Duration(days: i)),
+      (i) => DateTime(year, 1, 1).add(Duration(days: i)),
     );
-    final totalScheduled = allDays.where((d) => habit.isScheduledOn(d) && !_isFutureDate(d)).length;
+    final totalScheduled = allDays
+        .where((d) => habit.isScheduledOn(d) && !_isFutureDate(d))
+        .length;
     final completed = habit.completions.entries.where((e) {
       final d = DateTime.tryParse(e.key);
       return d != null && d.year == year && e.value >= habit.completionsPerDay;
@@ -3165,11 +3503,15 @@ class _YearCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Text('Year',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14,
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
                   color: AppTheme.textPrimary)),
           const Spacer(),
           Text(pct,
-              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13,
+              style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
                   color: AppTheme.textSecondary)),
           const SizedBox(width: 8),
           GestureDetector(
@@ -3177,7 +3519,8 @@ class _YearCard extends StatelessWidget {
             onTap: () => showHabitActions(context, habit, store),
             child: Padding(
               padding: const EdgeInsets.all(4),
-              child: Icon(Icons.more_horiz, color: AppTheme.textTertiary, size: 18),
+              child: Icon(Icons.more_horiz,
+                  color: AppTheme.textTertiary, size: 18),
             ),
           ),
         ]),
@@ -3193,7 +3536,8 @@ class _YearDotGrid extends StatefulWidget {
   final Habit habit;
   final HabitStore store;
   final int year;
-  const _YearDotGrid({required this.habit, required this.store, required this.year});
+  const _YearDotGrid(
+      {required this.habit, required this.store, required this.year});
 
   @override
   State<_YearDotGrid> createState() => _YearDotGridState();
@@ -3223,7 +3567,8 @@ class _YearDotGridState extends State<_YearDotGrid>
     super.didUpdateWidget(old);
     if (old.habit.id != widget.habit.id || old.year != widget.year) {
       final scheduledCount = _countScheduledPastDays();
-      _ctrl.duration = Duration(milliseconds: (scheduledCount * 6).clamp(2000, 2500));
+      _ctrl.duration =
+          Duration(milliseconds: (scheduledCount * 6).clamp(2000, 2500));
       _ctrl.forward(from: 0);
     }
   }
@@ -3237,7 +3582,8 @@ class _YearDotGridState extends State<_YearDotGrid>
   int _countScheduledPastDays() {
     final now = DateTime.now();
     final start = DateTime(widget.year, 1, 1);
-    final totalDays = DateTime(widget.year, 12, 31).difference(start).inDays + 1;
+    final totalDays =
+        DateTime(widget.year, 12, 31).difference(start).inDays + 1;
     int count = 0;
     for (int i = 0; i < totalDays; i++) {
       final d = start.add(Duration(days: i));
@@ -3253,7 +3599,8 @@ class _YearDotGridState extends State<_YearDotGrid>
       builder: (context, _) {
         final now = DateTime.now();
         final start = DateTime(widget.year, 1, 1);
-        final totalDays = DateTime(widget.year, 12, 31).difference(start).inDays + 1;
+        final totalDays =
+            DateTime(widget.year, 12, 31).difference(start).inDays + 1;
         final startPad = start.weekday - 1;
         final totalCells = ((startPad + totalDays) / 7).ceil() * 7;
         final weeks = totalCells ~/ 7;
@@ -3294,7 +3641,8 @@ class _YearDotGridState extends State<_YearDotGrid>
         }
 
         return LayoutBuilder(builder: (_, box) {
-          final d = ((box.maxWidth - gap * (weeks - 1)) / weeks).clamp(3.0, 11.0);
+          final d =
+              ((box.maxWidth - gap * (weeks - 1)) / weeks).clamp(3.0, 11.0);
           final rowH = d + gap;
 
           return SizedBox(
@@ -3311,16 +3659,19 @@ class _YearDotGridState extends State<_YearDotGrid>
                       final cellIdx = wIdx * 7 + dow;
                       final type = types[cellIdx];
                       final cellDate = dates[cellIdx];
-                      final isToday = cellDate != null && _isSameDate(cellDate, now);
+                      final isToday =
+                          cellDate != null && _isSameDate(cellDate, now);
                       return GestureDetector(
                         onTap: () {
                           if (cellDate == null) return;
-                          _handleHabitDayTap(context, widget.store, widget.habit, cellDate);
+                          _handleHabitDayTap(
+                              context, widget.store, widget.habit, cellDate);
                         },
                         child: Container(
                           width: d,
                           height: d,
-                          margin: EdgeInsets.only(right: wIdx < weeks - 1 ? gap : 0),
+                          margin: EdgeInsets.only(
+                              right: wIdx < weeks - 1 ? gap : 0),
                           child: _CircleDayDot(
                             type: type,
                             isToday: isToday,
@@ -3365,11 +3716,13 @@ class _StatisticsTabState extends State<StatisticsTab> {
         backgroundColor: AppTheme.bg,
         body: SafeArea(
           child: _ResponsiveWrapper(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _TabHeader(title: widget.store.text('statistics')),
               Expanded(
-                  child: Center(child: Text(widget.store.text('noHabitsYet'),
-                      style: TextStyle(color: AppTheme.textSecondary)))),
+                  child: Center(
+                      child: Text(widget.store.text('noHabitsYet'),
+                          style: TextStyle(color: AppTheme.textSecondary)))),
             ]),
           ),
         ),
@@ -3392,105 +3745,125 @@ class _StatisticsTabState extends State<StatisticsTab> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
                 child: Text(widget.store.text('statistics'),
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700,
+                    style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
                         color: AppTheme.textPrimary)),
               ),
-              Builder(
-                  builder: (cardContext) { // cardContext gives us the exact location of this card
-                    return _Card(
-                      child: GestureDetector(
-                        onTap: () {
-                          // 1. Get the exact position of this specific Card on the screen
-                          final RenderBox box = cardContext.findRenderObject() as RenderBox;
-                          final RenderBox overlay = Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+              Builder(builder: (cardContext) {
+                // cardContext gives us the exact location of this card
+                return _Card(
+                  child: GestureDetector(
+                    onTap: () {
+                      // 1. Get the exact position of this specific Card on the screen
+                      final RenderBox box =
+                          cardContext.findRenderObject() as RenderBox;
+                      final RenderBox overlay = Navigator.of(context)
+                          .overlay!
+                          .context
+                          .findRenderObject() as RenderBox;
 
-                          // 2. Calculate the position (Pushes the menu to start at the bottom of the card)
-                          final RelativeRect position = RelativeRect.fromRect(
-                            Rect.fromPoints(
-                              box.localToGlobal(box.size.bottomLeft(Offset.zero), ancestor: overlay),
-                              box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
-                            ),
-                            Offset.zero & overlay.size,
-                          );
-
-                          // 3. Show the menu
-                          showMenu<int>(
-                            context: context,
-                            position: position,
-                            color: AppTheme.surface,
-                            elevation: 4,
-                            constraints: BoxConstraints(
-                              minWidth: box.size.width, // Makes menu match the width of the selector
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            items: habits.asMap().entries.map((e) {
-                              final bool isSelected = e.key == _selIdx;
-                              return PopupMenuItem<int>(
-                                value: e.key,
-                                child: Row(
-                                  children: [
-                                    _HabitIconBox(iconData: e.value.iconData, size: 24),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        e.value.title,
-                                        style: TextStyle(
-                                          color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
-                                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                    if (isSelected)
-                                      Icon(Icons.check, size: 16, color: AppTheme.textPrimary),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ).then((i) {
-                            if (i != null) setState(() => _selIdx = i);
-                          });
-                        },
-                        child: Container(
-                          color: Colors.transparent, // Ensures entire card is tappable
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              _HabitIconBox(iconData: h.iconData),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  h.title,
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Icon(Icons.keyboard_arrow_down, color: AppTheme.textSecondary, size: 20),
-                            ],
-                          ),
+                      // 2. Calculate the position (Pushes the menu to start at the bottom of the card)
+                      final RelativeRect position = RelativeRect.fromRect(
+                        Rect.fromPoints(
+                          box.localToGlobal(box.size.bottomLeft(Offset.zero),
+                              ancestor: overlay),
+                          box.localToGlobal(box.size.bottomRight(Offset.zero),
+                              ancestor: overlay),
                         ),
+                        Offset.zero & overlay.size,
+                      );
+
+                      // 3. Show the menu
+                      showMenu<int>(
+                        context: context,
+                        position: position,
+                        color: AppTheme.surface,
+                        elevation: 4,
+                        constraints: BoxConstraints(
+                          minWidth: box.size
+                              .width, // Makes menu match the width of the selector
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        items: habits.asMap().entries.map((e) {
+                          final bool isSelected = e.key == _selIdx;
+                          return PopupMenuItem<int>(
+                            value: e.key,
+                            child: Row(
+                              children: [
+                                _HabitIconBox(
+                                    iconData: e.value.iconData, size: 24),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    e.value.title,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? AppTheme.textPrimary
+                                          : AppTheme.textSecondary,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(Icons.check,
+                                      size: 16, color: AppTheme.textPrimary),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ).then((i) {
+                        if (i != null) setState(() => _selIdx = i);
+                      });
+                    },
+                    child: Container(
+                      color:
+                          Colors.transparent, // Ensures entire card is tappable
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          _HabitIconBox(iconData: h.iconData),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              h.title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Icon(Icons.keyboard_arrow_down,
+                              color: AppTheme.textSecondary, size: 20),
+                        ],
                       ),
-                    );
-                  }
-              ),
+                    ),
+                  ),
+                );
+              }),
               const SizedBox(height: 10),
 
               // YEAR GRID CARD
-              _Card(child: Column(children: [
+              _Card(
+                  child: Column(children: [
                 Row(children: [
                   GestureDetector(
                       onTap: () => setState(() => _year--),
-                      child: Icon(Icons.chevron_left, size: 22,
-                          color: AppTheme.textSecondary)),
-                  Expanded(child: Text('$_year',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+                      child: Icon(Icons.chevron_left,
+                          size: 22, color: AppTheme.textSecondary)),
+                  Expanded(
+                      child: Text('$_year',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 15))),
                   GestureDetector(
                       onTap: () => setState(() => _year++),
-                      child: Icon(Icons.chevron_right, size: 22,
-                          color: AppTheme.textSecondary)),
+                      child: Icon(Icons.chevron_right,
+                          size: 22, color: AppTheme.textSecondary)),
                 ]),
                 const SizedBox(height: 10),
                 _YearDotGrid(habit: h, store: widget.store, year: _year),
@@ -3499,75 +3872,88 @@ class _StatisticsTabState extends State<StatisticsTab> {
 
               // 1. ANIMATED MINI STATS (Completed Days & Rate)
               Row(children: [
-                Expanded(child: _AnimatedStatMini(
-                    key: ValueKey('done_${h.id}_$_year'),
-                    iconData: Icons.tag,
-                    label: widget.store.text('completedDays'),
-                    endValue: done.toDouble(),
-                    formatter: (v) => '${v.toInt()}')),
+                Expanded(
+                    child: _AnimatedStatMini(
+                        key: ValueKey('done_${h.id}_$_year'),
+                        iconData: Icons.tag,
+                        label: widget.store.text('completedDays'),
+                        endValue: done.toDouble(),
+                        formatter: (v) => '${v.toInt()}')),
                 const SizedBox(width: 10),
-                Expanded(child: _AnimatedStatMini(
-                    key: ValueKey('rate_${h.id}_$_year'),
-                    iconData: Icons.percent,
-                    label: widget.store.text('completionRate'),
-                    endValue: rate,
-                    formatter: (v) => '${(v * 100).round()}%')),
+                Expanded(
+                    child: _AnimatedStatMini(
+                        key: ValueKey('rate_${h.id}_$_year'),
+                        iconData: Icons.percent,
+                        label: widget.store.text('completionRate'),
+                        endValue: rate,
+                        formatter: (v) => '${(v * 100).round()}%')),
               ]),
               const SizedBox(height: 10),
 
               // 2. ANIMATED MONTHLY CHART (The "Pop" effect from your image)
               // ANIMATED MONTHLY CHART
-              _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Text(widget.store.text('monthlyCompletions'),
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  const Spacer(),
-                  _IconSq(Icons.show_chart),
-                ]),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 110,
-                  child: TweenAnimationBuilder<double>(
-                    key: ValueKey('chart_${h.id}_$_year'),
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    duration: const Duration(milliseconds: 800),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, animValue, child) {
-                      return _SplineChart(
-                        data: monthly.map((v) => v.toDouble() * animValue).toList(),
-                        labels: AppStrings.months(widget.store.languageCode),
-                      );
-                    },
-                  ),
-                ),
-              ])),
+              _Card(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      Text(widget.store.text('monthlyCompletions'),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13)),
+                      const Spacer(),
+                      _IconSq(Icons.show_chart),
+                    ]),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 110,
+                      child: TweenAnimationBuilder<double>(
+                        key: ValueKey('chart_${h.id}_$_year'),
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        duration: const Duration(milliseconds: 800),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, animValue, child) {
+                          return _SplineChart(
+                            data: monthly
+                                .map((v) => v.toDouble() * animValue)
+                                .toList(),
+                            labels:
+                                AppStrings.months(widget.store.languageCode),
+                          );
+                        },
+                      ),
+                    ),
+                  ])),
               const SizedBox(height: 10),
 
               // 3. ANIMATED DAILY STREAKS
               Row(children: [
-                Expanded(child: _StreakCard(
-                    iconData: Icons.local_fire_department_outlined,
-                    label: '${widget.store.text('currentDailyStreak')}\n',
-                    value: h.currentDailyStreak())),
+                Expanded(
+                    child: _StreakCard(
+                        iconData: Icons.local_fire_department_outlined,
+                        label: '${widget.store.text('currentDailyStreak')}\n',
+                        value: h.currentDailyStreak())),
                 const SizedBox(width: 10),
-                Expanded(child: _StreakCard(
-                    iconData: Icons.emoji_events_outlined,
-                    label: '${widget.store.text('bestDailyStreak')}\n',
-                    value: h.bestDailyStreak())),
+                Expanded(
+                    child: _StreakCard(
+                        iconData: Icons.emoji_events_outlined,
+                        label: '${widget.store.text('bestDailyStreak')}\n',
+                        value: h.bestDailyStreak())),
               ]),
               const SizedBox(height: 10),
 
               // 4. ANIMATED WEEKLY STREAKS
               Row(children: [
-                Expanded(child: _StreakCard(
-                    iconData: Icons.star_outline,
-                    label: '${widget.store.text('currentWeeklyStreak')}\n',
-                    value: h.currentWeeklyStreak())),
+                Expanded(
+                    child: _StreakCard(
+                        iconData: Icons.star_outline,
+                        label: '${widget.store.text('currentWeeklyStreak')}\n',
+                        value: h.currentWeeklyStreak())),
                 const SizedBox(width: 10),
-                Expanded(child: _StreakCard(
-                    iconData: Icons.military_tech_outlined,
-                    label: '${widget.store.text('bestWeeklyStreak')}\n',
-                    value: h.bestWeeklyStreak())),
+                Expanded(
+                    child: _StreakCard(
+                        iconData: Icons.military_tech_outlined,
+                        label: '${widget.store.text('bestWeeklyStreak')}\n',
+                        value: h.bestWeeklyStreak())),
               ]),
 
               // ... (Notes section remains the same)
@@ -3585,31 +3971,55 @@ class _StreakCard extends StatefulWidget {
   final IconData iconData;
   final String label;
   final int value;
-  const _StreakCard({super.key, required this.iconData, required this.label, required this.value});
+  const _StreakCard(
+      {super.key,
+      required this.iconData,
+      required this.label,
+      required this.value});
   @override
   State<_StreakCard> createState() => _StreakCardState();
 }
-class _StreakCardState extends State<_StreakCard> with SingleTickerProviderStateMixin {
+
+class _StreakCardState extends State<_StreakCard>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 700));
-  late final Animation<double> _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
-  @override void initState() { super.initState(); _ctrl.forward(); }
-  @override void dispose() { _ctrl.dispose(); super.dispose(); }
+  late final Animation<double> _anim =
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => _Card(
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        _IconSq(widget.iconData),
-        const SizedBox(width: 8),
-        Expanded(child: Text(widget.label,
-            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.3))),
-      ]),
-      const SizedBox(height: 10),
-      AnimatedBuilder(animation: _anim, builder: (_, __) =>
-          Text('${(_anim.value * widget.value).toInt()}',
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700))),
-    ]),
-  );
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            _IconSq(widget.iconData),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(widget.label,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                        height: 1.3))),
+          ]),
+          const SizedBox(height: 10),
+          AnimatedBuilder(
+              animation: _anim,
+              builder: (_, __) => Text(
+                  '${(_anim.value * widget.value).toInt()}',
+                  style: const TextStyle(
+                      fontSize: 26, fontWeight: FontWeight.w700))),
+        ]),
+      );
 }
 
 class _AnimatedStatMini extends StatefulWidget {
@@ -3617,32 +4027,54 @@ class _AnimatedStatMini extends StatefulWidget {
   final String label;
   final double endValue;
   final String Function(double) formatter;
-  const _AnimatedStatMini({super.key, required this.iconData, required this.label,
-    required this.endValue, required this.formatter});
+  const _AnimatedStatMini(
+      {super.key,
+      required this.iconData,
+      required this.label,
+      required this.endValue,
+      required this.formatter});
   @override
   State<_AnimatedStatMini> createState() => _AnimatedStatMiniState();
 }
-class _AnimatedStatMiniState extends State<_AnimatedStatMini> with SingleTickerProviderStateMixin {
+
+class _AnimatedStatMiniState extends State<_AnimatedStatMini>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 700));
-  late final Animation<double> _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
-  @override void initState() { super.initState(); _ctrl.forward(); }
-  @override void dispose() { _ctrl.dispose(); super.dispose(); }
+  late final Animation<double> _anim =
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => _Card(
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        _IconSq(widget.iconData),
-        const SizedBox(width: 8),
-        Expanded(child: Text(widget.label,
-            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary))),
-      ]),
-      const SizedBox(height: 10),
-      AnimatedBuilder(animation: _anim, builder: (_, __) =>
-          Text(widget.formatter(_anim.value * widget.endValue),
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700))),
-    ]),
-  );
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            _IconSq(widget.iconData),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(widget.label,
+                    style: TextStyle(
+                        fontSize: 11, color: AppTheme.textSecondary))),
+          ]),
+          const SizedBox(height: 10),
+          AnimatedBuilder(
+              animation: _anim,
+              builder: (_, __) => Text(
+                  widget.formatter(_anim.value * widget.endValue),
+                  style: const TextStyle(
+                      fontSize: 26, fontWeight: FontWeight.w700))),
+        ]),
+      );
 }
 
 void _launchUrl(String url) async {
@@ -3668,18 +4100,22 @@ class SettingsTab extends StatelessWidget {
         backgroundColor: AppTheme.bg,
         body: SafeArea(
           child: _ResponsiveWrapper(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _TabHeader(title: store.text('settings')),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   children: [
                     _SettingsTile(
                       icon: Icons.notifications_outlined,
                       title: store.text('notifications'),
                       subtitle: store.text('notificationsDescription'),
-                      onTap: () => Navigator.push(context,
-                          _SlideRoute(child: _NotificationsSettingsPage(store: store))),
+                      onTap: () => Navigator.push(
+                          context,
+                          _SlideRoute(
+                              child: _NotificationsSettingsPage(store: store))),
                     ),
                     _SettingsTile(
                       icon: Icons.palette_outlined,
@@ -3692,15 +4128,19 @@ class SettingsTab extends StatelessWidget {
                       icon: Icons.language_outlined,
                       title: store.text('language'),
                       subtitle: store.text('languageDescription'),
-                      onTap: () => Navigator.push(context,
-                          _SlideRoute(child: _LanguageSettingsPage(store: store))),
+                      onTap: () => Navigator.push(
+                          context,
+                          _SlideRoute(
+                              child: _LanguageSettingsPage(store: store))),
                     ),
                     _SettingsTile(
                       icon: Icons.archive_outlined,
                       title: store.text('archive'),
                       subtitle: store.text('archiveDescription'),
-                      onTap: () => Navigator.push(context,
-                          _SlideRoute(child: _ArchiveSettingsPage(store: store))),
+                      onTap: () => Navigator.push(
+                          context,
+                          _SlideRoute(
+                              child: _ArchiveSettingsPage(store: store))),
                     ),
                     _SettingsTile(
                       icon: Icons.privacy_tip_outlined,
@@ -3719,8 +4159,8 @@ class SettingsTab extends StatelessWidget {
                       icon: Icons.feedback_outlined,
                       title: 'Feedback',
                       subtitle: 'Send us your thoughts',
-                      onTap: () => _launchUrl(
-                          'https://doingnow.lovable.app/contact'),
+                      onTap: () =>
+                          _launchUrl('https://doingnow.lovable.app/contact'),
                     ),
                   ],
                 ),
@@ -3739,109 +4179,122 @@ class _NotificationsSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: store,
-    builder: (_, __) => _SettingsScaffold(
-      title: store.text('notifications'),
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        children: [
-          // Battery optimization banner — critical for killed-app notifications
-          if (Platform.isAndroid)
-            GestureDetector(
-              onTap: () => NotificationService.instance.requestBatteryOptimizationAccess(),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.cardSurface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.cardBorder),
-                ),
-                child: Row(children: [
-                  Icon(Icons.battery_saver_outlined, size: 18, color: AppTheme.textPrimary),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Background activity',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(height: 2),
-                    Text('Set doingnow to Unrestricted so reminders fire when the app is closed.',
-                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.4)),
-                  ])),
-                  Icon(Icons.chevron_right, size: 16, color: AppTheme.textTertiary),
-                ]),
-              ),
-            ),
-
-          // Master toggle
-          _Card(
-            child: Row(
-              children: [
-                _IconSq(Icons.notifications_outlined),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        store.text('notifications'),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 14),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        store.text('notificationsDescription'),
-                        style: TextStyle(
-                            fontSize: 12, color: AppTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                _ThemedSwitch(
-                  value: store.notificationsEnabled,
-                  onChanged: store.updateNotificationsEnabled,
-                ),
-              ],
-            ),
-          ),
-          // Per-habit toggles (only shown when master is on)
-          if (store.notificationsEnabled) ...[
-            const SizedBox(height: 4),
-            ...store.habits.map((habit) => _Card(
-              child: Row(
-                children: [
-                  _HabitIconBox(iconData: habit.iconData, size: 36),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(habit.title,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 14)),
-                        Text(
-                          '${habit.reminder.time.hour.toString().padLeft(2, '0')}:${habit.reminder.time.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary),
-                        ),
-                      ],
+        animation: store,
+        builder: (_, __) => _SettingsScaffold(
+          title: store.text('notifications'),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            children: [
+              // Battery optimization banner — critical for killed-app notifications
+              if (Platform.isAndroid)
+                GestureDetector(
+                  onTap: () => NotificationService.instance
+                      .requestBatteryOptimizationAccess(),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardSurface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.cardBorder),
                     ),
+                    child: Row(children: [
+                      Icon(Icons.battery_saver_outlined,
+                          size: 18, color: AppTheme.textPrimary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text('Background activity',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 13)),
+                            const SizedBox(height: 2),
+                            Text(
+                                'Set doingnow to Unrestricted so reminders fire when the app is closed.',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textSecondary,
+                                    height: 1.4)),
+                          ])),
+                      Icon(Icons.chevron_right,
+                          size: 16, color: AppTheme.textTertiary),
+                    ]),
                   ),
-                  _ThemedSwitch(
-                    value: habit.notificationEnabled,
-                    onChanged: (v) {
-                      habit.notificationEnabled = v;
-                      store.updateHabit(habit);
-                    },
-                  ),
-                ],
+                ),
+
+              // Master toggle
+              _Card(
+                child: Row(
+                  children: [
+                    _IconSq(Icons.notifications_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            store.text('notifications'),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            store.text('notificationsDescription'),
+                            style: TextStyle(
+                                fontSize: 12, color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _ThemedSwitch(
+                      value: store.notificationsEnabled,
+                      onChanged: store.updateNotificationsEnabled,
+                    ),
+                  ],
+                ),
               ),
-            )),
-          ],
-        ],
-      ),
-    ),
-  );
+              // Per-habit toggles (only shown when master is on)
+              if (store.notificationsEnabled) ...[
+                const SizedBox(height: 4),
+                ...store.habits.map((habit) => _Card(
+                      child: Row(
+                        children: [
+                          _HabitIconBox(iconData: habit.iconData, size: 36),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(habit.title,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14)),
+                                Text(
+                                  '${habit.reminder.time.hour.toString().padLeft(2, '0')}:${habit.reminder.time.minute.toString().padLeft(2, '0')}',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _ThemedSwitch(
+                            value: habit.notificationEnabled,
+                            onChanged: (v) {
+                              habit.notificationEnabled = v;
+                              store.updateHabit(habit);
+                            },
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
+            ],
+          ),
+        ),
+      );
 }
 
 class _SettingsTile extends StatelessWidget {
@@ -3858,20 +4311,21 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _Card(
-    child: ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: _IconSq(icon),
-      title: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Text(subtitle,
-            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-      ),
-      trailing: Icon(Icons.chevron_right, color: AppTheme.textSecondary),
-      onTap: onTap,
-    ),
-  );
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: _IconSq(icon),
+          title: Text(title,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(subtitle,
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+          ),
+          trailing: Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+          onTap: onTap,
+        ),
+      );
 }
 
 class _SettingsScaffold extends StatelessWidget {
@@ -3912,40 +4366,44 @@ class _ThemeSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: store,
-    builder: (_, __) {
-      final entries = [
-        (AppThemeModePreference.light, store.text('light')),
-        (AppThemeModePreference.dark, store.text('dark')),
-      ];
-      return _SettingsScaffold(
-        title: store.text('theme'),
-        child: ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          itemCount: entries.length,
-          separatorBuilder: (_, __) => Divider(color: AppTheme.divider, height: 1),
-          itemBuilder: (_, index) {
-            final entry = entries[index];
-            final selected = store.themePreference == entry.$1;
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(entry.$2,
-                  style: TextStyle(fontSize: 16, color: AppTheme.textPrimary)),
-              trailing: selected
-                  ? Container(
-                width: 18, height: 18,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF7A7A73),
-                ),
-              ) : null,
-              onTap: () => store.updateThemePreference(entry.$1),
-            );
-          },
-        ),
+        animation: store,
+        builder: (_, __) {
+          final entries = [
+            (AppThemeModePreference.light, store.text('light')),
+            (AppThemeModePreference.dark, store.text('dark')),
+          ];
+          return _SettingsScaffold(
+            title: store.text('theme'),
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              itemCount: entries.length,
+              separatorBuilder: (_, __) =>
+                  Divider(color: AppTheme.divider, height: 1),
+              itemBuilder: (_, index) {
+                final entry = entries[index];
+                final selected = store.themePreference == entry.$1;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(entry.$2,
+                      style:
+                          TextStyle(fontSize: 16, color: AppTheme.textPrimary)),
+                  trailing: selected
+                      ? Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFF7A7A73),
+                          ),
+                        )
+                      : null,
+                  onTap: () => store.updateThemePreference(entry.$1),
+                );
+              },
+            ),
+          );
+        },
       );
-    },
-  );
 }
 
 class _LanguageSettingsPage extends StatelessWidget {
@@ -3954,35 +4412,40 @@ class _LanguageSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: store,
-    builder: (_, __) => _SettingsScaffold(
-      title: store.text('language'),
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        itemCount: kAppLanguages.length,
-        separatorBuilder: (_, __) => Divider(color: AppTheme.divider, height: 1),
-        itemBuilder: (_, index) {
-          final language = kAppLanguages[index];
-          final selected = store.languageCode == language.code;
-          return ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Text(language.flag, style: const TextStyle(fontSize: 22)),
-            title: Text(language.name,
-                style: TextStyle(fontSize: 16, color: AppTheme.textPrimary)),
-            trailing: selected
-                ? Container(
-              width: 18, height: 18,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF7A7A73),
-              ),
-            ) : null,
-            onTap: () => store.updateLanguage(language.code),
-          );
-        },
-      ),
-    ),
-  );
+        animation: store,
+        builder: (_, __) => _SettingsScaffold(
+          title: store.text('language'),
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            itemCount: kAppLanguages.length,
+            separatorBuilder: (_, __) =>
+                Divider(color: AppTheme.divider, height: 1),
+            itemBuilder: (_, index) {
+              final language = kAppLanguages[index];
+              final selected = store.languageCode == language.code;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading:
+                    Text(language.flag, style: const TextStyle(fontSize: 22)),
+                title: Text(language.name,
+                    style:
+                        TextStyle(fontSize: 16, color: AppTheme.textPrimary)),
+                trailing: selected
+                    ? Container(
+                        width: 18,
+                        height: 18,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF7A7A73),
+                        ),
+                      )
+                    : null,
+                onTap: () => store.updateLanguage(language.code),
+              );
+            },
+          ),
+        ),
+      );
 }
 
 class _ArchiveSettingsPage extends StatelessWidget {
@@ -3991,65 +4454,74 @@ class _ArchiveSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: store,
-    builder: (_, __) => _SettingsScaffold(
-      title: store.text('archive'),
-      child: store.archivedHabits.isEmpty
-          ? Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.archive_outlined, color: AppTheme.textTertiary, size: 44),
-            const SizedBox(height: 12),
-            Text(store.text('noArchivedHabits'),
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 15)),
-            const SizedBox(height: 6),
-            Text(store.text('emptyArchiveHint'),
-                style: TextStyle(color: AppTheme.textTertiary, fontSize: 12)),
-          ],
-        ),
-      )
-          : ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        itemCount: store.archivedHabits.length,
-        itemBuilder: (_, index) {
-          final habit = store.archivedHabits[index];
-          return _Card(
-            child: Row(
-              children: [
-                _HabitIconBox(iconData: habit.iconData),
-                const SizedBox(width: 10),
-                Expanded(
+        animation: store,
+        builder: (_, __) => _SettingsScaffold(
+          title: store.text('archive'),
+          child: store.archivedHabits.isEmpty
+              ? Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(habit.title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14)),
-                      if (habit.category.isNotEmpty)
-                        Text(habit.category,
-                            style: TextStyle(
-                                color: AppTheme.textSecondary, fontSize: 12)),
+                      Icon(Icons.archive_outlined,
+                          color: AppTheme.textTertiary, size: 44),
+                      const SizedBox(height: 12),
+                      Text(store.text('noArchivedHabits'),
+                          style: TextStyle(
+                              color: AppTheme.textSecondary, fontSize: 15)),
+                      const SizedBox(height: 6),
+                      Text(store.text('emptyArchiveHint'),
+                          style: TextStyle(
+                              color: AppTheme.textTertiary, fontSize: 12)),
                     ],
                   ),
+                )
+              : ListView.builder(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  itemCount: store.archivedHabits.length,
+                  itemBuilder: (_, index) {
+                    final habit = store.archivedHabits[index];
+                    return _Card(
+                      child: Row(
+                        children: [
+                          _HabitIconBox(iconData: habit.iconData),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(habit.title,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14)),
+                                if (habit.category.isNotEmpty)
+                                  Text(habit.category,
+                                      style: TextStyle(
+                                          color: AppTheme.textSecondary,
+                                          fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => store.restoreHabit(habit.id),
+                            icon: Icon(Icons.restore_outlined,
+                                color: AppTheme.textPrimary),
+                            tooltip: store.text('restore'),
+                          ),
+                          IconButton(
+                            onPressed: () =>
+                                _confirmDeleteHabit(context, store, habit),
+                            icon: Icon(Icons.delete_outline,
+                                color: AppTheme.danger),
+                            tooltip: store.text('delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-                IconButton(
-                  onPressed: () => store.restoreHabit(habit.id),
-                  icon: Icon(Icons.restore_outlined, color: AppTheme.textPrimary),
-                  tooltip: store.text('restore'),
-                ),
-                IconButton(
-                  onPressed: () => _confirmDeleteHabit(context, store, habit),
-                  icon: Icon(Icons.delete_outline, color: AppTheme.danger),
-                  tooltip: store.text('delete'),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    ),
-  );
+        ),
+      );
 }
 
 class _PrivacyPolicyPage extends StatelessWidget {
@@ -4058,34 +4530,34 @@ class _PrivacyPolicyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _SettingsScaffold(
-    title: store.text('privacyPolicy'),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-      child: Column(
-        children: [
-          const Spacer(),
-          Text(
-            store.text('privacyText'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 15,
-              height: 1.6,
-            ),
+        title: store.text('privacyPolicy'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+          child: Column(
+            children: [
+              const Spacer(),
+              Text(
+                store.text('privacyText'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                  height: 1.6,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                store.text('versionClean'),
+                style: TextStyle(
+                  color: AppTheme.textTertiary,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
-          const Spacer(),
-          Text(
-            store.text('versionClean'),
-            style: TextStyle(
-              color: AppTheme.textTertiary,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4099,19 +4571,21 @@ class _TabHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
-    child: Row(children: [
-      Text(title,
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary)),
-      const Spacer(),
-      if (onAdd != null)
-        GestureDetector(
-          onTap: onAdd,
-          child: Icon(Icons.add, size: 26, color: AppTheme.textPrimary),
-        ),
-    ]),
-  );
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+        child: Row(children: [
+          Text(title,
+              style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary)),
+          const Spacer(),
+          if (onAdd != null)
+            GestureDetector(
+              onTap: onAdd,
+              child: Icon(Icons.add, size: 26, color: AppTheme.textPrimary),
+            ),
+        ]),
+      );
 }
 
 class _Card extends StatelessWidget {
@@ -4120,15 +4594,15 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 8),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    decoration: BoxDecoration(
-      color: AppTheme.cardSurface,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppTheme.cardBorder, width: 1.0),
-    ),
-    child: child,
-  );
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.cardSurface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.cardBorder, width: 1.0),
+        ),
+        child: child,
+      );
 }
 
 class _HabitHeader extends StatelessWidget {
@@ -4139,24 +4613,25 @@ class _HabitHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(children: [
-    _HabitIconBox(iconData: habit.iconData),
-    const SizedBox(width: 10),
-    Expanded(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(habit.title,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-        if (sub != null)
-          Text(sub!,
-              style: TextStyle(
-                  fontSize: 11, color: AppTheme.textSecondary)),
-      ]),
-    ),
-    GestureDetector(
-      onTap: () => showHabitActions(context, habit, store),
-      child: Icon(Icons.more_vert,
-          size: 18, color: AppTheme.textSecondary),
-    ),
-  ]);
+        _HabitIconBox(iconData: habit.iconData),
+        const SizedBox(width: 10),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(habit.title,
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            if (sub != null)
+              Text(sub!,
+                  style:
+                      TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          ]),
+        ),
+        GestureDetector(
+          onTap: () => showHabitActions(context, habit, store),
+          child: Icon(Icons.more_vert, size: 18, color: AppTheme.textSecondary),
+        ),
+      ]);
 }
 
 class _HabitIconBox extends StatelessWidget {
@@ -4166,17 +4641,17 @@ class _HabitIconBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      color: AppTheme.surface,
-      shape: BoxShape.circle,
-      border: Border.all(color: AppTheme.border, width: 1),
-    ),
-    child: Center(
-      child: Icon(iconData, size: size * 0.52, color: AppTheme.textPrimary),
-    ),
-  );
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppTheme.border, width: 1),
+        ),
+        child: Center(
+          child: Icon(iconData, size: size * 0.52, color: AppTheme.textPrimary),
+        ),
+      );
 }
 
 class _IconSq extends StatelessWidget {
@@ -4185,15 +4660,15 @@ class _IconSq extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 28,
-    height: 28,
-    decoration: BoxDecoration(
-      color: AppTheme.surface,
-      shape: BoxShape.circle,
-      border: Border.all(color: AppTheme.border, width: 1),
-    ),
-    child: Center(child: Icon(icon, size: 14, color: AppTheme.textPrimary)),
-  );
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppTheme.border, width: 1),
+        ),
+        child: Center(child: Icon(icon, size: 14, color: AppTheme.textPrimary)),
+      );
 }
 
 // Cell types
@@ -4243,28 +4718,27 @@ class _CircleDayDot extends StatelessWidget {
         break;
 
       case _CT.undone:
-      // Past incomplete — transparent fill with theme-specific border
+        // Past incomplete — transparent fill with theme-specific border
         bg = Colors.transparent;
 
-        final isDark =
-            Theme.of(context).brightness == Brightness.dark;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         borderColor = isToday
             ? AppTheme.textPrimary
             : (isDark
-            ? const Color(0xFF222222) // Dark theme
-            : const Color(0xFFCACACA)); // Light theme
+                ? const Color(0xFF222222) // Dark theme
+                : const Color(0xFFCACACA)); // Light theme
 
         break;
 
       case _CT.empty:
-      // Upcoming (future) days — swapped: was inactive color
+        // Upcoming (future) days — swapped: was inactive color
         bg = AppTheme.upcomingDot;
         borderColor = AppTheme.upcomingDot;
         break;
 
       case _CT.gray:
-      // Inactive (not scheduled) — swapped: was upcoming color
+        // Inactive (not scheduled) — swapped: was upcoming color
         bg = AppTheme.inactiveDot;
         borderColor = AppTheme.inactiveDot;
         break;
@@ -4278,9 +4752,9 @@ class _CircleDayDot extends StatelessWidget {
         shape: BoxShape.circle,
         border: borderWidth > 0
             ? Border.all(
-          color: borderColor,
-          width: isToday ? borderWidth + 0.7 : borderWidth,
-        )
+                color: borderColor,
+                width: isToday ? borderWidth + 0.7 : borderWidth,
+              )
             : null,
       ),
       child: inner != null ? Center(child: inner) : null,
@@ -4336,16 +4810,16 @@ class _SplineChartState extends State<_SplineChart>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _animation,
-    builder: (_, __) => CustomPaint(
-      size: const Size(double.infinity, 110),
-      painter: _SplinePainter(
-        data: widget.data,
-        labels: widget.labels,
-        animationValue: _animation.value,
-      ),
-    ),
-  );
+        animation: _animation,
+        builder: (_, __) => CustomPaint(
+          size: const Size(double.infinity, 110),
+          painter: _SplinePainter(
+            data: widget.data,
+            labels: widget.labels,
+            animationValue: _animation.value,
+          ),
+        ),
+      );
 }
 
 class _SplinePainter extends CustomPainter {
@@ -4370,9 +4844,11 @@ class _SplinePainter extends CustomPainter {
 
     // How many points are "active" — reveals one by one
     // animationValue 0→1 maps across all n points
-    final double progress = animationValue * (n - 1); // e.g. 0 → 11 for 12 months
-    final int fullPoints = progress.floor();           // fully revealed points
-    final double partial = progress - fullPoints;      // 0→1 fraction into next point
+    final double progress =
+        animationValue * (n - 1); // e.g. 0 → 11 for 12 months
+    final int fullPoints = progress.floor(); // fully revealed points
+    final double partial =
+        progress - fullPoints; // 0→1 fraction into next point
 
     // Grid
     final gridPaint = Paint()
@@ -4384,8 +4860,8 @@ class _SplinePainter extends CustomPainter {
     }
 
     // Build all points at full height — but only reveal up to current progress
-    final allPts = List.generate(n, (i) =>
-        Offset(i * stepX, chartH - (data[i] / chartMax) * chartH));
+    final allPts = List.generate(
+        n, (i) => Offset(i * stepX, chartH - (data[i] / chartMax) * chartH));
 
     // Visible points: fully revealed ones + interpolated next point
     final List<Offset> pts = [];
@@ -4412,8 +4888,10 @@ class _SplinePainter extends CustomPainter {
       final p = Path()..moveTo(points[0].dx, points[0].dy);
       for (int i = 0; i < points.length - 1; i++) {
         final cp1 = Offset((points[i].dx + points[i + 1].dx) / 2, points[i].dy);
-        final cp2 = Offset((points[i].dx + points[i + 1].dx) / 2, points[i + 1].dy);
-        p.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, points[i + 1].dx, points[i + 1].dy);
+        final cp2 =
+            Offset((points[i].dx + points[i + 1].dx) / 2, points[i + 1].dy);
+        p.cubicTo(
+            cp1.dx, cp1.dy, cp2.dx, cp2.dy, points[i + 1].dx, points[i + 1].dy);
       }
       return p;
     }
@@ -4467,18 +4945,26 @@ class _SplinePainter extends CustomPainter {
   }
 
   void _drawDot(Canvas canvas, Offset p) {
-    canvas.drawCircle(p, 3, Paint()..color = Colors.white..style = PaintingStyle.fill);
-    canvas.drawCircle(p, 3, Paint()
-      ..color = AppTheme.textPrimary
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4);
+    canvas.drawCircle(
+        p,
+        3,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill);
+    canvas.drawCircle(
+        p,
+        3,
+        Paint()
+          ..color = AppTheme.textPrimary
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4);
   }
 
   @override
   bool shouldRepaint(_SplinePainter old) =>
       old.animationValue != animationValue ||
-          old.data != data ||
-          old.labels != labels;
+      old.data != data ||
+      old.labels != labels;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4498,19 +4984,42 @@ void showHabitActions(BuildContext context, Habit habit, HabitStore store) {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 4),
           Text(habit.title,
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14,
+              style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                   color: AppTheme.textSecondary),
-              maxLines: 1, overflow: TextOverflow.ellipsis),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
           Divider(color: AppTheme.cardBorder, height: 1),
-          _ATile(icon: Icons.calendar_month_outlined, label: store.text('calendar'),
-              onTap: () { Navigator.pop(context); _showCal(context, habit, store); }),
-          _ATile(icon: Icons.edit_outlined, label: store.text('edit'),
-              onTap: () { Navigator.pop(context); showCreateDialog(context, store, existing: habit); }),
-          _ATile(icon: Icons.share_outlined, label: store.text('share'),
-              onTap: () { Navigator.pop(context); _showShareSheet(context, store, habit); }),
-          _ATile(icon: Icons.archive_outlined, label: store.text('archive'),
-              onTap: () { Navigator.pop(context); store.archiveHabit(habit.id); }),
+          _ATile(
+              icon: Icons.calendar_month_outlined,
+              label: store.text('calendar'),
+              onTap: () {
+                Navigator.pop(context);
+                _showCal(context, habit, store);
+              }),
+          _ATile(
+              icon: Icons.edit_outlined,
+              label: store.text('edit'),
+              onTap: () {
+                Navigator.pop(context);
+                showCreateDialog(context, store, existing: habit);
+              }),
+          _ATile(
+              icon: Icons.share_outlined,
+              label: store.text('share'),
+              onTap: () {
+                Navigator.pop(context);
+                _showShareSheet(context, store, habit);
+              }),
+          _ATile(
+              icon: Icons.archive_outlined,
+              label: store.text('archive'),
+              onTap: () {
+                Navigator.pop(context);
+                store.archiveHabit(habit.id);
+              }),
           const SizedBox(height: 4),
         ]),
       ),
@@ -4519,11 +5028,12 @@ void showHabitActions(BuildContext context, Habit habit, HabitStore store) {
 }
 
 Widget _dragHandle() => Container(
-  width: 36, height: 4,
-  margin: const EdgeInsets.only(bottom: 10),
-  decoration: BoxDecoration(
-      color: AppTheme.gray, borderRadius: BorderRadius.circular(2)),
-);
+      width: 36,
+      height: 4,
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+          color: AppTheme.gray, borderRadius: BorderRadius.circular(2)),
+    );
 
 class _ATile extends StatelessWidget {
   final IconData icon;
@@ -4533,13 +5043,13 @@ class _ATile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-    leading: Icon(icon, color: AppTheme.textPrimary, size: 21),
-    title: Text(label,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w400)),
-    trailing: const SizedBox.shrink(),
-    onTap: onTap,
-    visualDensity: VisualDensity.compact,
-  );
+        leading: Icon(icon, color: AppTheme.textPrimary, size: 21),
+        title: Text(label,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w400)),
+        trailing: const SizedBox.shrink(),
+        onTap: onTap,
+        visualDensity: VisualDensity.compact,
+      );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4572,12 +5082,28 @@ class _CalSheetState extends State<_CalSheet> {
   late DateTime _month;
 
   static const _monthNames = [
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December'
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
   ];
-  static const _dayLabels = ['M','T','W','T','F','S','S'];
+  static const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   static const _fullDayNames = [
-    'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday'
   ];
 
   @override
@@ -4600,45 +5126,65 @@ class _CalSheetState extends State<_CalSheet> {
         Row(children: [
           GestureDetector(
               onTap: () => setState(
-                      () => _month = DateTime(_month.year, _month.month - 1)),
-              child: Icon(Icons.chevron_left, color: AppTheme.textPrimary, size: 20)),
-          Expanded(child: Text(
-              '${_monthNames[_month.month - 1]} ${_month.year}',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13,
-                  color: AppTheme.textPrimary))),
+                  () => _month = DateTime(_month.year, _month.month - 1)),
+              child: Icon(Icons.chevron_left,
+                  color: AppTheme.textPrimary, size: 20)),
+          Expanded(
+              child: Text('${_monthNames[_month.month - 1]} ${_month.year}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: AppTheme.textPrimary))),
           GestureDetector(
               onTap: () => setState(
-                      () => _month = DateTime(_month.year, _month.month + 1)),
-              child: Icon(Icons.chevron_right, color: AppTheme.textPrimary, size: 20)),
+                  () => _month = DateTime(_month.year, _month.month + 1)),
+              child: Icon(Icons.chevron_right,
+                  color: AppTheme.textPrimary, size: 20)),
         ]),
         const SizedBox(height: 14),
         // Two-column layout: left = date info, right = grid
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // LEFT: month abbr / full day name / large date number
-          SizedBox(width: 76, child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_monthNames[_month.month - 1].substring(0, 3),
-                  style: TextStyle(fontSize: 11,
-                      color: AppTheme.textSecondary, fontWeight: FontWeight.w400)),
-              Text(_fullDayNames[now.weekday - 1],
-                  style: TextStyle(fontSize: 12,
-                      color: AppTheme.textPrimary, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text(now.day.toString().padLeft(2, '0'),
-                  style: TextStyle(fontSize: 40, height: 1.0,
-                      fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-            ],
-          )),
+          SizedBox(
+              width: 76,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_monthNames[_month.month - 1].substring(0, 3),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w400)),
+                  Text(_fullDayNames[now.weekday - 1],
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 2),
+                  Text(now.day.toString().padLeft(2, '0'),
+                      style: TextStyle(
+                          fontSize: 40,
+                          height: 1.0,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary)),
+                ],
+              )),
           const SizedBox(width: 10),
           // RIGHT: weekday labels + grid
-          Expanded(child: Column(children: [
-            Row(children: _dayLabels.map((d) => Expanded(
-              child: Text(d, textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 9,
-                      color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
-            )).toList()),
+          Expanded(
+              child: Column(children: [
+            Row(
+                children: _dayLabels
+                    .map((d) => Expanded(
+                          child: Text(d,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  color: AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w500)),
+                        ))
+                    .toList()),
             const SizedBox(height: 4),
             GridView.builder(
               shrinkWrap: true,
@@ -4656,9 +5202,11 @@ class _CalSheetState extends State<_CalSheet> {
                   final label = dayNum < 1
                       ? '${DateTime(_month.year, _month.month, 0).day + dayNum}'
                       : '${dayNum - daysInMonth}';
-                  return Center(child: Text(label,
-                      style: TextStyle(fontSize: 10,
-                          color: AppTheme.textTertiary.withOpacity(0.3))));
+                  return Center(
+                      child: Text(label,
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.textTertiary.withOpacity(0.3))));
                 }
                 final date = DateTime(_month.year, _month.month, dayNum);
                 final sched = widget.habit.isScheduledOn(date);
@@ -4668,27 +5216,35 @@ class _CalSheetState extends State<_CalSheet> {
 
                 return GestureDetector(
                   onTap: () {
-                    _handleHabitDayTap(context, widget.store, widget.habit, date);
+                    _handleHabitDayTap(
+                        context, widget.store, widget.habit, date);
                     setState(() {});
                   },
                   child: Center(
                     child: Container(
-                      width: 24, height: 24,
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: done ? const Color(0xFF1C1C1C) : Colors.transparent,
+                        color:
+                            done ? const Color(0xFF1C1C1C) : Colors.transparent,
                         border: isToday && !done
-                            ? Border.all(color: AppTheme.textPrimary, width: 1.5)
+                            ? Border.all(
+                                color: AppTheme.textPrimary, width: 1.5)
                             : null,
                       ),
-                      child: Center(child: Text('$dayNum',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: isToday ? FontWeight.w700 : FontWeight.w400,
-                            color: done ? Colors.white
-                                : !sched || isFuture ? AppTheme.textTertiary
-                                : AppTheme.textPrimary,
-                          ))),
+                      child: Center(
+                          child: Text('$dayNum',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight:
+                                    isToday ? FontWeight.w700 : FontWeight.w400,
+                                color: done
+                                    ? Colors.white
+                                    : !sched || isFuture
+                                        ? AppTheme.textTertiary
+                                        : AppTheme.textPrimary,
+                              ))),
                     ),
                   ),
                 );
@@ -4701,12 +5257,12 @@ class _CalSheetState extends State<_CalSheet> {
   }
 }
 
-
 // ═══════════════════════════════════════════════════════════
 //  CREATE / EDIT HABIT SHEET
 // ═══════════════════════════════════════════════════════════
 
-void showCreateDialog(BuildContext context, HabitStore store, {Habit? existing}) {
+void showCreateDialog(BuildContext context, HabitStore store,
+    {Habit? existing}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -4738,8 +5294,18 @@ class _CreateSheetState extends State<_CreateSheet> {
   int _iconTab = 0;
 
   static const _cats = [
-    'Home', 'Work', 'School', 'College', 'Morning', 'Evening',
-    'Afternoon', 'Night', 'Workout', 'Health', 'Finance', 'Mindfulness',
+    'Home',
+    'Work',
+    'School',
+    'College',
+    'Morning',
+    'Evening',
+    'Afternoon',
+    'Night',
+    'Workout',
+    'Health',
+    'Finance',
+    'Mindfulness',
   ];
 
   @override
@@ -4760,7 +5326,9 @@ class _CreateSheetState extends State<_CreateSheet> {
 
   @override
   void dispose() {
-    _title.dispose(); _desc.dispose(); _cat.dispose();
+    _title.dispose();
+    _desc.dispose();
+    _cat.dispose();
     super.dispose();
   }
 
@@ -4779,8 +5347,10 @@ class _CreateSheetState extends State<_CreateSheet> {
       notificationEnabled: _notificationEnabled,
       completions: widget.existing?.completions,
     );
-    if (widget.existing == null) widget.store.addHabit(h);
-    else widget.store.updateHabit(h);
+    if (widget.existing == null)
+      widget.store.addHabit(h);
+    else
+      widget.store.updateHabit(h);
     if (_notificationEnabled && !widget.store.notificationsEnabled) {
       widget.store.updateNotificationsEnabled(true);
     }
@@ -4798,13 +5368,16 @@ class _CreateSheetState extends State<_CreateSheet> {
       maxChildSize: 0.97,
       expand: false,
       builder: (_, scroll) => Padding(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Column(children: [
           const SizedBox(height: 12),
           _dragHandle(),
-          Text(widget.store.text(widget.existing == null ? 'createHabit' : 'editHabit'),
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+          Text(
+              widget.store
+                  .text(widget.existing == null ? 'createHabit' : 'editHabit'),
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
           Divider(height: 16, color: AppTheme.divider),
           Expanded(
             child: ListView(
@@ -4813,24 +5386,32 @@ class _CreateSheetState extends State<_CreateSheet> {
               children: [
                 _FF(controller: _title, hint: widget.store.text('title')),
                 const SizedBox(height: 10),
-                _FF(controller: _desc, hint: widget.store.text('description'), maxLines: 2),
+                _FF(
+                    controller: _desc,
+                    hint: widget.store.text('description'),
+                    maxLines: 2),
                 const SizedBox(height: 14),
 
                 // Selected icon preview
                 Row(children: [
                   Container(
-                    width: 44, height: 44,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: AppTheme.surface,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppTheme.cardBorder, width: 1.0),
+                      border:
+                          Border.all(color: AppTheme.cardBorder, width: 1.0),
                     ),
-                    child: Center(child: Icon(curIcon, size: 22,
-                        color: AppTheme.textPrimary)),
+                    child: Center(
+                        child: Icon(curIcon,
+                            size: 22, color: AppTheme.textPrimary)),
                   ),
                   const SizedBox(width: 10),
                   Text(widget.store.text('pickIcon'),
-                      style: TextStyle(fontWeight: FontWeight.w500, fontSize: 13,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
                           color: AppTheme.textSecondary)),
                 ]),
                 const SizedBox(height: 8),
@@ -4856,7 +5437,9 @@ class _CreateSheetState extends State<_CreateSheet> {
                                 color: active
                                     ? AppTheme.textPrimary
                                     : AppTheme.cardBorder,
-                                width: active ? 1.5 : 1.0), // Slightly thicker when active
+                                width: active
+                                    ? 1.5
+                                    : 1.0), // Slightly thicker when active
                           ),
                           child: Text(kIconCategories[i].name,
                               style: TextStyle(
@@ -4875,8 +5458,7 @@ class _CreateSheetState extends State<_CreateSheet> {
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 8,
                       mainAxisSpacing: 6,
                       crossAxisSpacing: 6,
@@ -4889,7 +5471,8 @@ class _CreateSheetState extends State<_CreateSheet> {
                       onTap: () => setState(() => _iconCP = opt.icon.codePoint),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: sel ? AppTheme.textPrimary : AppTheme.cardSurface,
+                          color:
+                              sel ? AppTheme.textPrimary : AppTheme.cardSurface,
                           shape: BoxShape.circle,
                           border: Border.all(
                               color: sel
@@ -4897,8 +5480,12 @@ class _CreateSheetState extends State<_CreateSheet> {
                                   : AppTheme.cardBorder,
                               width: 1.0),
                         ),
-                        child: Center(child: Icon(opt.icon, size: 18,
-                            color: sel ? AppTheme.surface : AppTheme.textPrimary)),
+                        child: Center(
+                            child: Icon(opt.icon,
+                                size: 18,
+                                color: sel
+                                    ? AppTheme.surface
+                                    : AppTheme.textPrimary)),
                       ),
                     );
                   },
@@ -4907,7 +5494,9 @@ class _CreateSheetState extends State<_CreateSheet> {
 
                 // Category
                 _DropF(
-                  label: _cat.text.isEmpty ? widget.store.text('category') : _cat.text,
+                  label: _cat.text.isEmpty
+                      ? widget.store.text('category')
+                      : _cat.text,
                   items: _cats,
                   onSelect: (v) => setState(() => _cat.text = v),
                   isSelected: _cat.text.isNotEmpty,
@@ -4917,15 +5506,18 @@ class _CreateSheetState extends State<_CreateSheet> {
                 // Completions per day
 
                 Text(widget.store.text('reminder'),
-                    style: TextStyle(fontWeight: FontWeight.w600,
-                        fontSize: 12, color: AppTheme.textSecondary)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: AppTheme.textSecondary)),
                 const SizedBox(height: 8),
-                Row(children: List.generate(7, (i) {
+                Row(
+                    children: List.generate(7, (i) {
                   final sel = _days.contains(i);
                   return Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(() =>
-                      sel ? _days.remove(i) : _days.add(i)),
+                      onTap: () =>
+                          setState(() => sel ? _days.remove(i) : _days.add(i)),
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 2),
                         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -4964,7 +5556,8 @@ class _CreateSheetState extends State<_CreateSheet> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 14),
                     decoration: BoxDecoration(
-                      border: Border.all(color: AppTheme.cardBorder, width: 1.0),
+                      border:
+                          Border.all(color: AppTheme.cardBorder, width: 1.0),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(children: [
@@ -4983,8 +5576,8 @@ class _CreateSheetState extends State<_CreateSheet> {
 
 // Notification toggle for this habit
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppTheme.cardBorder, width: 1.0),
                     borderRadius: BorderRadius.circular(12),
@@ -5006,8 +5599,10 @@ class _CreateSheetState extends State<_CreateSheet> {
                 const SizedBox(height: 16),
 
                 Text(widget.store.text('showStreak'),
-                    style: TextStyle(fontWeight: FontWeight.w600,
-                        fontSize: 12, color: AppTheme.textSecondary)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: AppTheme.textSecondary)),
                 const SizedBox(height: 8),
                 Row(children: [
                   Expanded(
@@ -5025,7 +5620,8 @@ class _CreateSheetState extends State<_CreateSheet> {
                               color: _streakType == StreakType.daily
                                   ? AppTheme.textPrimary
                                   : AppTheme.border.withOpacity(0.4),
-                              width: _streakType == StreakType.daily ? 1.5 : 1.1),
+                              width:
+                                  _streakType == StreakType.daily ? 1.5 : 1.1),
                         ),
                         child: Text(widget.store.text('daily'),
                             textAlign: TextAlign.center,
@@ -5050,7 +5646,8 @@ class _CreateSheetState extends State<_CreateSheet> {
                               color: _streakType == StreakType.weekly
                                   ? AppTheme.textPrimary
                                   : AppTheme.border.withOpacity(0.4),
-                              width: _streakType == StreakType.weekly ? 1.5 : 1.1),
+                              width:
+                                  _streakType == StreakType.weekly ? 1.5 : 1.1),
                         ),
                         child: Text(widget.store.text('weekly'),
                             textAlign: TextAlign.center,
@@ -5077,10 +5674,10 @@ class _CreateSheetState extends State<_CreateSheet> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       elevation: 0,
                     ),
-                    onPressed:
-                    _title.text.trim().isEmpty ? null : _save,
+                    onPressed: _title.text.trim().isEmpty ? null : _save,
                     child: Text(
-                        widget.store.text(widget.existing == null ? 'save' : 'update'),
+                        widget.store
+                            .text(widget.existing == null ? 'save' : 'update'),
                         style: const TextStyle(
                             fontWeight: FontWeight.w600, fontSize: 16)),
                   ),
@@ -5130,13 +5727,13 @@ class _ThemedSwitchState extends State<_ThemedSwitch> {
   Widget build(BuildContext context) {
     final isDark = AppTheme.isDark;
     final activeTrackColor =
-    isDark ? const Color(0xFF3A3A3A) : const Color(0xFF0D0D0D);
+        isDark ? const Color(0xFF3A3A3A) : const Color(0xFF0D0D0D);
     final activeThumbColor =
-    isDark ? const Color(0xFFFFFFFF) : const Color(0xFFFBF6F6);
+        isDark ? const Color(0xFFFFFFFF) : const Color(0xFFFBF6F6);
     final inactiveTrackColor =
-    isDark ? const Color(0xFF2A2A2A) : AppTheme.borderLight;
+        isDark ? const Color(0xFF2A2A2A) : AppTheme.borderLight;
     final inactiveThumbColor =
-    isDark ? const Color(0xFF888888) : AppTheme.textTertiary;
+        isDark ? const Color(0xFF888888) : AppTheme.textTertiary;
 
     return Semantics(
       button: true,
@@ -5161,7 +5758,8 @@ class _ThemedSwitchState extends State<_ThemedSwitch> {
           child: AnimatedAlign(
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOutCubic,
-            alignment: _displayValue ? Alignment.centerRight : Alignment.centerLeft,
+            alignment:
+                _displayValue ? Alignment.centerRight : Alignment.centerLeft,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 500),
               curve: Curves.easeInOutCubic,
@@ -5172,7 +5770,8 @@ class _ThemedSwitchState extends State<_ThemedSwitch> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: _displayValue ? 0.18 : 0.08),
+                    color: Colors.black
+                        .withValues(alpha: _displayValue ? 0.18 : 0.08),
                     blurRadius: _displayValue ? 8 : 4,
                     offset: const Offset(0, 2),
                   ),
@@ -5240,17 +5839,21 @@ class _OnboardingFlowState extends State<_OnboardingFlow> {
               // Page indicator dots
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(4, (i) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 500),
-                  curve: Curves.easeInOut,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: _page == i ? 22 : 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: _page == i ? AppTheme.textPrimary : AppTheme.textTertiary,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                )),
+                children: List.generate(
+                    4,
+                    (i) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeInOut,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: _page == i ? 22 : 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: _page == i
+                                ? AppTheme.textPrimary
+                                : AppTheme.textTertiary,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        )),
               ),
               const SizedBox(height: 18),
               SizedBox(
@@ -5280,7 +5883,8 @@ class _OnboardingFlowState extends State<_OnboardingFlow> {
                 TextButton(
                   onPressed: widget.onComplete,
                   child: Text('Skip',
-                      style: TextStyle(color: AppTheme.textTertiary, fontSize: 13)),
+                      style: TextStyle(
+                          color: AppTheme.textTertiary, fontSize: 13)),
                 )
               else
                 const SizedBox(height: 36),
@@ -5292,63 +5896,67 @@ class _OnboardingFlowState extends State<_OnboardingFlow> {
   }
 
   Widget _ob1() => _ObPage(
-    icon: Icons.track_changes_outlined,
-    tag: 'Build Better Habits',
-    title: 'Small steps,\nbig change.',
-    body: 'Consistency beats intensity every time. Just 5–10 minutes a day, '
-        'done repeatedly, rewires how you think and act. Doingnow makes '
-        'showing up effortless — so you never lose your streak.',
-    bullets: const [
-      '✓  Track any habit — fitness, reading, journaling',
-      '✓  See your progress at a glance every day',
-      '✓  Build momentum that lasts for months',
-    ],
-    preview: _PreviewMonthCard(),
-  );
+        icon: Icons.track_changes_outlined,
+        tag: 'Build Better Habits',
+        title: 'Small steps,\nbig change.',
+        body:
+            'Consistency beats intensity every time. Just 5–10 minutes a day, '
+            'done repeatedly, rewires how you think and act. Doingnow makes '
+            'showing up effortless — so you never lose your streak.',
+        bullets: const [
+          '✓  Track any habit — fitness, reading, journaling',
+          '✓  See your progress at a glance every day',
+          '✓  Build momentum that lasts for months',
+        ],
+        preview: _PreviewMonthCard(),
+      );
 
   Widget _ob2() => _ObPage(
-    icon: Icons.auto_graph_outlined,
-    tag: 'Visualise Your Progress',
-    title: 'Watch your\nstreak grow.',
-    body: 'Every completed day fills a dot. Watch your monthly grid, weekly '
-        'row, and yearly map fill up — turning invisible effort into '
-        'something you can actually see and be proud of.',
-    bullets: const [
-      '✓  Month grid — see the whole month at once',
-      '✓  Year view — 365 days of your journey',
-      '✓  Stats — streaks, completion rate, trends',
-    ],
-    preview: _PreviewYearCard(),
-  );
+        icon: Icons.auto_graph_outlined,
+        tag: 'Visualise Your Progress',
+        title: 'Watch your\nstreak grow.',
+        body:
+            'Every completed day fills a dot. Watch your monthly grid, weekly '
+            'row, and yearly map fill up — turning invisible effort into '
+            'something you can actually see and be proud of.',
+        bullets: const [
+          '✓  Month grid — see the whole month at once',
+          '✓  Year view — 365 days of your journey',
+          '✓  Stats — streaks, completion rate, trends',
+        ],
+        preview: _PreviewYearCard(),
+      );
 
   Widget _ob3() => _ObPage(
-    icon: Icons.palette_outlined,
-    tag: 'Designed to Stay',
-    title: 'Clean, fast,\nand private.',
-    body: 'No account needed. No cloud. Your data lives only on your device. '
-        'A distraction-free interface that adapts to light and dark mode — '
-        'fast, reliable, and always with you.',
-    bullets: const [
-      '✓  100% offline — works without internet',
-      '✓  No ads, no subscriptions, ever',
-      '✓  Light & dark mode, multiple languages',
-    ],
-    preview: _PreviewCleanUI(),
-  );
+        icon: Icons.palette_outlined,
+        tag: 'Designed to Stay',
+        title: 'Clean, fast,\nand private.',
+        body:
+            'No account needed. No cloud. Your data lives only on your device. '
+            'A distraction-free interface that adapts to light and dark mode — '
+            'fast, reliable, and always with you.',
+        bullets: const [
+          '✓  100% offline — works without internet',
+          '✓  No ads, no subscriptions, ever',
+          '✓  Light & dark mode, multiple languages',
+        ],
+        preview: _PreviewCleanUI(),
+      );
 
   Widget _ob4() => _ObPage(
-    icon: Icons.notifications_outlined,
-    tag: 'Stay On Track',
-    title: 'Reminders\nthat show up.',
-    body: 'Set a daily reminder for each habit. Doingnow sends a notification '
-        'at your chosen time — even when the app is closed — so you never '
-        'forget to check in.',
-    bullets: const [
-      '✓  Per-habit reminders at your chosen time',
-      '✓  Works in the background, even when closed',
-      '✓  You can always change this in Settings',
-    ],
-  );
+        icon: Icons.notifications_outlined,
+        tag: 'Stay On Track',
+        title: 'Reminders\nthat show up.',
+        body:
+            'Set a daily reminder for each habit. Doingnow sends a notification '
+            'at your chosen time — even when the app is closed — so you never '
+            'forget to check in.',
+        bullets: const [
+          '✓  Per-habit reminders at your chosen time',
+          '✓  Works in the background, even when closed',
+          '✓  You can always change this in Settings',
+        ],
+      );
 }
 
 class _ObPage extends StatelessWidget {
@@ -5357,9 +5965,14 @@ class _ObPage extends StatelessWidget {
   final List<String>? bullets;
   final Widget? extra;
   final Widget? preview;
-  const _ObPage({required this.icon, required this.tag,
-    required this.title, required this.body,
-    this.bullets, this.extra, this.preview});
+  const _ObPage(
+      {required this.icon,
+      required this.tag,
+      required this.title,
+      required this.body,
+      this.bullets,
+      this.extra,
+      this.preview});
 
   @override
   Widget build(BuildContext context) {
@@ -5368,37 +5981,45 @@ class _ObPage extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Icon circle
         Container(
-          width: 50, height: 50,
+          width: 50,
+          height: 50,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppTheme.cardSurface,
             border: Border.all(color: AppTheme.cardBorder),
           ),
-          child: Center(child: Icon(icon, size: 22, color: AppTheme.textPrimary)),
+          child:
+              Center(child: Icon(icon, size: 22, color: AppTheme.textPrimary)),
         ),
         const SizedBox(height: 18),
         Text(tag.toUpperCase(),
-            style: TextStyle(fontSize: 9, letterSpacing: 1.5,
-                fontWeight: FontWeight.w600, color: AppTheme.textTertiary)),
+            style: TextStyle(
+                fontSize: 9,
+                letterSpacing: 1.5,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textTertiary)),
         const SizedBox(height: 6),
         Text(title,
-            style: TextStyle(fontSize: 26, height: 1.2,
-                fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+            style: TextStyle(
+                fontSize: 26,
+                height: 1.2,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimary)),
         const SizedBox(height: 14),
         Text(body,
-            style: TextStyle(fontSize: 13, height: 1.65,
-                color: AppTheme.textSecondary)),
+            style: TextStyle(
+                fontSize: 13, height: 1.65, color: AppTheme.textSecondary)),
         if (bullets != null) ...[
           const SizedBox(height: 16),
           ...bullets!.map((b) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(b,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textSecondary,
-                  height: 1.4,
-                )),
-          )),
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(b,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    )),
+              )),
         ],
         if (extra != null) extra!,
         if (preview != null) ...[
@@ -5426,35 +6047,54 @@ class _PreviewMonthCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(width: 22, height: 22,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                  color: AppTheme.bg, border: Border.all(color: AppTheme.faintBorder)),
-              child: Center(child: Icon(Icons.menu_book_outlined, size: 12,
-                  color: AppTheme.textPrimary))),
+          Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.bg,
+                  border: Border.all(color: AppTheme.faintBorder)),
+              child: Center(
+                  child: Icon(Icons.menu_book_outlined,
+                      size: 12, color: AppTheme.textPrimary))),
           const SizedBox(width: 6),
-          Expanded(child: Text('Study',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              overflow: TextOverflow.ellipsis)),
+          Expanded(
+              child: Text('Study',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 13),
+                  overflow: TextOverflow.ellipsis)),
           Icon(Icons.more_horiz, color: AppTheme.textTertiary, size: 16),
         ]),
         const SizedBox(height: 4),
-        Row(children: ['M','T','W','T','F','S','S'].map((d) => Expanded(
-          child: Text(d, textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 7.5, color: AppTheme.textSecondary,
-                  fontWeight: FontWeight.w500)),
-        )).toList()),
+        Row(
+            children: ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+                .map((d) => Expanded(
+                      child: Text(d,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 7.5,
+                              color: AppTheme.textSecondary,
+                              fontWeight: FontWeight.w500)),
+                    ))
+                .toList()),
         const SizedBox(height: 2),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7, mainAxisSpacing: 2, crossAxisSpacing: 2,
+              crossAxisCount: 7,
+              mainAxisSpacing: 2,
+              crossAxisSpacing: 2,
               childAspectRatio: 1.9),
           itemCount: 35,
           itemBuilder: (_, i) {
             final done = (i * 7 + i * 3 + 11) % 10 < 6 && i < 26;
             final future = i >= 26;
-            final type = future ? _CT.empty : done ? _CT.done : _CT.undone;
+            final type = future
+                ? _CT.empty
+                : done
+                    ? _CT.done
+                    : _CT.undone;
             return _DayCell(type: type);
           },
         ),
@@ -5475,30 +6115,43 @@ class _PreviewYearCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Text('Year', style: TextStyle(fontWeight: FontWeight.w700,
-              fontSize: 13, color: AppTheme.textPrimary)),
+          Text('Year',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: AppTheme.textPrimary)),
           const Spacer(),
-          Text('31%', style: TextStyle(fontSize: 12,
-              color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+          Text('31%',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w500)),
         ]),
         const SizedBox(height: 10),
         // Preview dot grid: 5 rows × 18 cols
-        ...List.generate(5, (row) => Padding(
-          padding: const EdgeInsets.only(bottom: 3),
-          child: Row(
-            children: List.generate(18, (col) {
-              final done = row < 2 || (row == 2 && col < 5);
-              final future = row >= 3;
-              final type = future ? _CT.empty
-                  : done ? _CT.done : _CT.undone;
-              return Expanded(child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 1.5),
-                child: AspectRatio(aspectRatio: 1,
-                    child: _CircleDayDot(type: type, size: 8)),
-              ));
-            }),
-          ),
-        )),
+        ...List.generate(
+            5,
+            (row) => Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(
+                    children: List.generate(18, (col) {
+                      final done = row < 2 || (row == 2 && col < 5);
+                      final future = row >= 3;
+                      final type = future
+                          ? _CT.empty
+                          : done
+                              ? _CT.done
+                              : _CT.undone;
+                      return Expanded(
+                          child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                        child: AspectRatio(
+                            aspectRatio: 1,
+                            child: _CircleDayDot(type: type, size: 8)),
+                      ));
+                    }),
+                  ),
+                )),
       ]),
     );
   }
@@ -5517,22 +6170,35 @@ class _PreviewCleanUI extends StatelessWidget {
           border: Border.all(color: AppTheme.cardBorder),
         ),
         child: Row(children: [
-          Container(width: 32, height: 32,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                  color: AppTheme.bg, border: Border.all(color: AppTheme.faintBorder)),
-              child: Center(child: Icon(Icons.fitness_center_outlined,
-                  size: 14, color: AppTheme.textPrimary))),
+          Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.bg,
+                  border: Border.all(color: AppTheme.faintBorder)),
+              child: Center(
+                  child: Icon(Icons.fitness_center_outlined,
+                      size: 14, color: AppTheme.textPrimary))),
           const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Morning run', style: TextStyle(fontWeight: FontWeight.w600,
-                    fontSize: 13, color: AppTheme.textPrimary)),
-                Text('Health', style: TextStyle(fontSize: 10,
-                    color: AppTheme.textSecondary)),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text('Morning run',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: AppTheme.textPrimary)),
+                Text('Health',
+                    style:
+                        TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
               ])),
-          Container(width: 22, height: 22,
-            decoration: BoxDecoration(shape: BoxShape.circle,
-                color: AppTheme.doneDot),
+          Container(
+            width: 22,
+            height: 22,
+            decoration:
+                BoxDecoration(shape: BoxShape.circle, color: AppTheme.doneDot),
           ),
         ]),
       ),
@@ -5545,21 +6211,35 @@ class _PreviewCleanUI extends StatelessWidget {
           border: Border.all(color: AppTheme.cardBorder),
         ),
         child: Row(children: [
-          Container(width: 32, height: 32,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                  color: AppTheme.bg, border: Border.all(color: AppTheme.faintBorder)),
-              child: Center(child: Icon(Icons.menu_book_outlined,
-                  size: 14, color: AppTheme.textPrimary))),
+          Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.bg,
+                  border: Border.all(color: AppTheme.faintBorder)),
+              child: Center(
+                  child: Icon(Icons.menu_book_outlined,
+                      size: 14, color: AppTheme.textPrimary))),
           const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Read 20 pages', style: TextStyle(fontWeight: FontWeight.w600,
-                    fontSize: 13, color: AppTheme.textPrimary)),
-                Text('Learning', style: TextStyle(fontSize: 10,
-                    color: AppTheme.textSecondary)),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text('Read 20 pages',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: AppTheme.textPrimary)),
+                Text('Learning',
+                    style:
+                        TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
               ])),
-          Container(width: 22, height: 22,
-            decoration: BoxDecoration(shape: BoxShape.circle,
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 color: Colors.transparent,
                 border: Border.all(color: AppTheme.cardBorder)),
           ),
@@ -5574,22 +6254,29 @@ class _ObStep extends StatelessWidget {
   const _ObStep(this.num, this.text);
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(children: [
-      Container(
-        width: 20, height: 20,
-        decoration: BoxDecoration(
-            shape: BoxShape.circle, color: AppTheme.textPrimary),
-        child: Center(child: Text(num,
-            style: const TextStyle(fontSize: 10, color: Colors.white,
-                fontWeight: FontWeight.w700))),
-      ),
-      const SizedBox(width: 10),
-      Expanded(child: Text(text,
-          style: TextStyle(fontSize: 13, color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w500))),
-    ]),
-  );
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+                shape: BoxShape.circle, color: AppTheme.textPrimary),
+            child: Center(
+                child: Text(num,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700))),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w500))),
+        ]),
+      );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5644,7 +6331,8 @@ class _NotificationPermissionScreen extends StatelessWidget {
               // Description
               Text(
                 'Enable notifications to get reminders for your habits.',
-                style: TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.5),
+                style: TextStyle(
+                    fontSize: 14, color: AppTheme.textSecondary, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
@@ -5655,15 +6343,21 @@ class _NotificationPermissionScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppTheme.faintBorder),
                 ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('For reliable reminders:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary)),
-                  const SizedBox(height: 6),
-                  _PermStep('1', 'Go to App Info → Battery'),
-                  _PermStep('2', 'Select "Unrestricted" or "No restriction"'),
-                  _PermStep('3', 'This lets notifications work even when app is closed'),
-                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('For reliable reminders:',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimary)),
+                      const SizedBox(height: 6),
+                      _PermStep('1', 'Go to App Info → Battery'),
+                      _PermStep(
+                          '2', 'Select "Unrestricted" or "No restriction"'),
+                      _PermStep('3',
+                          'This lets notifications work even when app is closed'),
+                    ]),
               ),
               const Spacer(),
               // Allow button
@@ -5700,8 +6394,7 @@ class _NotificationPermissionScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(14),
-                      border:
-                      Border.all(color: AppTheme.cardBorder, width: 1),
+                      border: Border.all(color: AppTheme.cardBorder, width: 1),
                     ),
                     child: Text(
                       'Don\'t Allow',
@@ -5730,23 +6423,29 @@ class _PermStep extends StatelessWidget {
   const _PermStep(this.number, this.text);
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 4),
-    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(
-        width: 16, height: 16,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppTheme.textPrimary,
-        ),
-        child: Center(child: Text(number,
-            style: const TextStyle(fontSize: 9, color: Colors.white,
-                fontWeight: FontWeight.w700))),
-      ),
-      const SizedBox(width: 8),
-      Expanded(child: Text(text,
-          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
-    ]),
-  );
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.textPrimary,
+            ),
+            child: Center(
+                child: Text(number,
+                    style: const TextStyle(
+                        fontSize: 9,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700))),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(text,
+                  style:
+                      TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
+        ]),
+      );
 }
 
 class _FF extends StatelessWidget {
@@ -5757,28 +6456,29 @@ class _FF extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextField(
-    controller: controller,
-    maxLines: maxLines,
-    autocorrect: false,
-    enableSuggestions: false,
-    style: TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-    decoration: InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(color: AppTheme.textTertiary, fontSize: 14),
-      filled: true,
-      fillColor: Colors.transparent,
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.cardBorder, width: 1.0)),
-      enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.cardBorder, width: 1.0)),
-      focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.textPrimary, width: 1.4)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-    ),
-  );
+        controller: controller,
+        maxLines: maxLines,
+        autocorrect: false,
+        enableSuggestions: false,
+        style: TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: AppTheme.textTertiary, fontSize: 14),
+          filled: true,
+          fillColor: Colors.transparent,
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.cardBorder, width: 1.0)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.cardBorder, width: 1.0)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.textPrimary, width: 1.4)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        ),
+      );
 }
 
 class _DropF extends StatelessWidget {
@@ -5787,41 +6487,49 @@ class _DropF extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final bool isSelected;
   const _DropF(
-      {required this.label, required this.items, required this.onSelect,
-        this.isSelected = false});
+      {required this.label,
+      required this.items,
+      required this.onSelect,
+      this.isSelected = false});
 
   @override
   Widget build(BuildContext context) => PopupMenuButton<String>(
-    onSelected: onSelect,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    color: AppTheme.surface,
-    elevation: 4,
-    itemBuilder: (_) => items
-        .map((i) => PopupMenuItem(
-      value: i,
-      child: Text(i, style: TextStyle(
-          color: AppTheme.textPrimary, fontSize: 14)),
-    ))
-        .toList(),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        border: Border.all(
-            color: isSelected ? AppTheme.textPrimary : AppTheme.cardBorder,
-            width: isSelected ? 1.5 : 1.0),
-        borderRadius: BorderRadius.circular(12),
+        onSelected: onSelect,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         color: AppTheme.surface,
-      ),
-      child: Row(children: [
-        Expanded(child: Text(label,
-            style: TextStyle(fontSize: 14,
-                color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
-                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400))),
-        Icon(Icons.keyboard_arrow_down,
-            color: AppTheme.textSecondary, size: 18),
-      ]),
-    ),
-  );
+        elevation: 4,
+        itemBuilder: (_) => items
+            .map((i) => PopupMenuItem(
+                  value: i,
+                  child: Text(i,
+                      style:
+                          TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                ))
+            .toList(),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            border: Border.all(
+                color: isSelected ? AppTheme.textPrimary : AppTheme.cardBorder,
+                width: isSelected ? 1.5 : 1.0),
+            borderRadius: BorderRadius.circular(12),
+            color: AppTheme.surface,
+          ),
+          child: Row(children: [
+            Expanded(
+                child: Text(label,
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: isSelected
+                            ? AppTheme.textPrimary
+                            : AppTheme.textSecondary,
+                        fontWeight:
+                            isSelected ? FontWeight.w500 : FontWeight.w400))),
+            Icon(Icons.keyboard_arrow_down,
+                color: AppTheme.textSecondary, size: 18),
+          ]),
+        ),
+      );
 }
 
 class _SBtn extends StatelessWidget {
@@ -5831,17 +6539,18 @@ class _SBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      width: 40, height: 40,
-      decoration: BoxDecoration(
-        border: Border.all(color: AppTheme.cardBorder, width: 1.0),
-        shape: BoxShape.circle,
-        color: AppTheme.surface,
-      ),
-      child: Icon(icon, size: 18, color: AppTheme.textPrimary),
-    ),
-  );
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppTheme.cardBorder, width: 1.0),
+            shape: BoxShape.circle,
+            color: AppTheme.surface,
+          ),
+          child: Icon(icon, size: 18, color: AppTheme.textPrimary),
+        ),
+      );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5849,7 +6558,20 @@ class _SBtn extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════
 
 String _monthAbbr(int month) {
-  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const names = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
   return names[month - 1];
 }
 
@@ -5879,15 +6601,14 @@ String _formatMonthYear(BuildContext context, DateTime date) =>
 String _formatFullDate(BuildContext context, DateTime date) =>
     '${date.day} ${AppStrings.months(_globalStore.languageCode)[date.month - 1]} ${date.year}';
 
-String _monthName(int m) =>
-    AppStrings.months(_globalStore.languageCode)[m - 1];
+String _monthName(int m) => AppStrings.months(_globalStore.languageCode)[m - 1];
 
 void _handleHabitDayTap(
-    BuildContext context,
-    HabitStore store,
-    Habit habit,
-    DateTime date,
-    ) {
+  BuildContext context,
+  HabitStore store,
+  Habit habit,
+  DateTime date,
+) {
   // Only today is tappable — past days are locked, future days are locked
   if (!_isSameDate(date, DateTime.now())) return;
   if (!habit.isScheduledOn(date)) return;
@@ -5895,10 +6616,10 @@ void _handleHabitDayTap(
 }
 
 Future<void> _showShareSheet(
-    BuildContext context,
-    HabitStore store,
-    Habit habit,
-    ) async {
+  BuildContext context,
+  HabitStore store,
+  Habit habit,
+) async {
   final today = DateTime.now();
   final summary = [
     habit.title,
@@ -5924,7 +6645,8 @@ Future<void> _showShareSheet(
           children: [
             _dragHandle(),
             Text(store.text('shareSummary'),
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             const SizedBox(height: 14),
             _Card(
               child: Row(
@@ -5999,10 +6721,10 @@ Future<void> _showShareSheet(
 }
 
 Future<void> _confirmDeleteHabit(
-    BuildContext context,
-    HabitStore store,
-    Habit habit,
-    ) async {
+  BuildContext context,
+  HabitStore store,
+  Habit habit,
+) async {
   final shouldDelete = await showDialog<bool>(
     context: context,
     barrierColor: Colors.black.withOpacity(0.4),
@@ -6021,15 +6743,13 @@ Future<void> _confirmDeleteHabit(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(store.text('delete'),
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w600)),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             Text(
               '"${habit.title}" ${store.text('deleteProgressTitle')}',
               style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textSecondary,
-                  height: 1.4),
+                  fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
             ),
             const SizedBox(height: 20),
             Row(children: [
