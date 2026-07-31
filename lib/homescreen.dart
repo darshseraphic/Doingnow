@@ -3380,10 +3380,6 @@ class _WeekCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  YEAR TAB
-// ═══════════════════════════════════════════════════════════
-
 class YearTab extends StatelessWidget {
   final HabitStore store;
   const YearTab({super.key, required this.store});
@@ -3491,7 +3487,6 @@ class _YearCard extends StatelessWidget {
   }
 }
 
-/// Year dot grid — animated fill from Jan 1 → today, one scheduled day at a time.
 class _YearDotGrid extends StatefulWidget {
   final Habit habit;
   final HabitStore store;
@@ -3511,11 +3506,9 @@ class _YearDotGridState extends State<_YearDotGrid>
   @override
   void initState() {
     super.initState();
-    // Count only scheduled past days — these are the ones we animate through
     final scheduledCount = _countScheduledPastDays();
     _ctrl = AnimationController(
       vsync: this,
-      // ~2ms per dot so it feels fast but still visible; min 400ms, max 1200ms
       duration: Duration(milliseconds: (scheduledCount * 6).clamp(2000, 2500)),
     );
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
@@ -3565,12 +3558,8 @@ class _YearDotGridState extends State<_YearDotGrid>
         final totalCells = ((startPad + totalDays) / 7).ceil() * 7;
         final weeks = totalCells ~/ 7;
         const gap = 2.0;
-
-        // How many scheduled past days should be revealed so far
         final scheduledCount = _countScheduledPastDays();
         final revealedCount = (_anim.value * scheduledCount).round();
-
-        // Build cell data — track scheduled past days seen so far
         final List<_CT> types = List.filled(totalCells, _CT.gray);
         final List<DateTime?> dates = List.filled(totalCells, null);
         int scheduledSeen = 0;
@@ -3585,16 +3574,13 @@ class _YearDotGridState extends State<_YearDotGrid>
           final isFuture = _isFutureDate(d);
 
           if (!sched) {
-            types[i] = _CT.gray; // not scheduled — always show as gray
+            types[i] = _CT.gray;
           } else if (isFuture) {
-            types[i] = _CT.empty; // future — always show as empty
-          } else {
-            // Scheduled past day — only reveal if within our animated count
+            types[i] = _CT.empty;
             scheduledSeen++;
             if (scheduledSeen <= revealedCount) {
               types[i] = done ? _CT.done : _CT.undone;
             } else {
-              // Not yet revealed — show as undone (scheduled but not filled yet)
               types[i] = _CT.undone;
             }
           }
@@ -3652,10 +3638,6 @@ class _YearDotGridState extends State<_YearDotGrid>
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  STATISTICS TAB
-// ═══════════════════════════════════════════════════════════
-
 class StatisticsTab extends StatefulWidget {
   final HabitStore store;
   const StatisticsTab({super.key, required this.store});
@@ -3701,7 +3683,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             children: [
-              // ... (Header and Habit Selector Card remain the same)
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
                 child: Text(widget.store.text('statistics'),
@@ -3711,19 +3692,15 @@ class _StatisticsTabState extends State<StatisticsTab> {
                         color: AppTheme.textPrimary)),
               ),
               Builder(builder: (cardContext) {
-                // cardContext gives us the exact location of this card
                 return _Card(
                   child: GestureDetector(
                     onTap: () {
-                      // 1. Get the exact position of this specific Card on the screen
                       final RenderBox box =
                           cardContext.findRenderObject() as RenderBox;
                       final RenderBox overlay = Navigator.of(context)
                           .overlay!
                           .context
                           .findRenderObject() as RenderBox;
-
-                      // 2. Calculate the position (Pushes the menu to start at the bottom of the card)
                       final RelativeRect position = RelativeRect.fromRect(
                         Rect.fromPoints(
                           box.localToGlobal(box.size.bottomLeft(Offset.zero),
@@ -3733,16 +3710,13 @@ class _StatisticsTabState extends State<StatisticsTab> {
                         ),
                         Offset.zero & overlay.size,
                       );
-
-                      // 3. Show the menu
                       showMenu<int>(
                         context: context,
                         position: position,
                         color: AppTheme.surface,
                         elevation: 4,
                         constraints: BoxConstraints(
-                          minWidth: box.size
-                              .width, // Makes menu match the width of the selector
+                          minWidth: box.size.width,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -3782,8 +3756,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
                       });
                     },
                     child: Container(
-                      color:
-                          Colors.transparent, // Ensures entire card is tappable
+                      color: Colors.transparent,
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         children: [
@@ -3829,8 +3802,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
                 _YearDotGrid(habit: h, store: widget.store, year: _year),
               ])),
               const SizedBox(height: 10),
-
-              // 1. ANIMATED MINI STATS (Completed Days & Rate)
               Row(children: [
                 Expanded(
                     child: _AnimatedStatMini(
@@ -3849,9 +3820,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
                         formatter: (v) => '${(v * 100).round()}%')),
               ]),
               const SizedBox(height: 10),
-
-              // 2. ANIMATED MONTHLY CHART (The "Pop" effect from your image)
-              // ANIMATED MONTHLY CHART
               _Card(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3884,8 +3852,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
                     ),
                   ])),
               const SizedBox(height: 10),
-
-              // 3. ANIMATED DAILY STREAKS
               Row(children: [
                 Expanded(
                     child: _StreakCard(
@@ -3900,8 +3866,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
                         value: h.bestDailyStreak())),
               ]),
               const SizedBox(height: 10),
-
-              // 4. ANIMATED WEEKLY STREAKS
               Row(children: [
                 Expanded(
                     child: _StreakCard(
@@ -3915,8 +3879,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
                         label: '${widget.store.text('bestWeeklyStreak')}\n',
                         value: h.bestWeeklyStreak())),
               ]),
-
-              // ... (Notes section remains the same)
               const SizedBox(height: 24),
             ],
           ),
@@ -3926,7 +3888,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
   }
 }
 
-// Updated _StreakCard with internal animation
 class _StreakCard extends StatefulWidget {
   final IconData iconData;
   final String label;
@@ -4044,10 +4005,6 @@ void _launchUrl(String url) async {
   } catch (_) {}
 }
 
-// ═══════════════════════════════════════════════════════════
-//  SETTINGS TAB
-// ═══════════════════════════════════════════════════════════
-
 class SettingsTab extends StatelessWidget {
   final HabitStore store;
   const SettingsTab({super.key, required this.store});
@@ -4145,7 +4102,6 @@ class _NotificationsSettingsPage extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
-              // Battery optimization banner — critical for killed-app notifications
               if (Platform.isAndroid)
                 GestureDetector(
                   onTap: () => NotificationService.instance
@@ -4183,8 +4139,6 @@ class _NotificationsSettingsPage extends StatelessWidget {
                     ]),
                   ),
                 ),
-
-              // Master toggle
               _Card(
                 child: Row(
                   children: [
@@ -4215,7 +4169,6 @@ class _NotificationsSettingsPage extends StatelessWidget {
                   ],
                 ),
               ),
-              // Per-habit toggles (only shown when master is on)
               if (store.notificationsEnabled) ...[
                 const SizedBox(height: 4),
                 ...store.habits.map((habit) => _Card(
@@ -4520,10 +4473,6 @@ class _PrivacyPolicyPage extends StatelessWidget {
       );
 }
 
-// ═══════════════════════════════════════════════════════════
-//  SHARED SMALL WIDGETS
-// ═══════════════════════════════════════════════════════════
-
 class _TabHeader extends StatelessWidget {
   final String title;
   final VoidCallback? onAdd;
@@ -4678,27 +4627,22 @@ class _CircleDayDot extends StatelessWidget {
         break;
 
       case _CT.undone:
-        // Past incomplete — transparent fill with theme-specific border
         bg = Colors.transparent;
 
         final isDark = Theme.of(context).brightness == Brightness.dark;
 
         borderColor = isToday
             ? AppTheme.textPrimary
-            : (isDark
-                ? const Color(0xFF222222) // Dark theme
-                : const Color(0xFFCACACA)); // Light theme
+            : (isDark ? const Color(0xFF222222) : const Color(0xFFCACACA));
 
         break;
 
       case _CT.empty:
-        // Upcoming (future) days — swapped: was inactive color
         bg = AppTheme.upcomingDot;
         borderColor = AppTheme.upcomingDot;
         break;
 
       case _CT.gray:
-        // Inactive (not scheduled) — swapped: was upcoming color
         bg = AppTheme.inactiveDot;
         borderColor = AppTheme.inactiveDot;
         break;
@@ -4721,10 +4665,6 @@ class _CircleDayDot extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════
-//  SPLINE CHART
-// ═══════════════════════════════════════════════════════════
 
 class _SplineChart extends StatefulWidget {
   final List<double> data;
