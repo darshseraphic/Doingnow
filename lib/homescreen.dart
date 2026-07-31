@@ -4741,16 +4741,9 @@ class _SplinePainter extends CustomPainter {
     final chartH = size.height - labelH;
     final n = data.length;
     final stepX = size.width / (n - 1);
-
-    // How many points are "active" — reveals one by one
-    // animationValue 0→1 maps across all n points
-    final double progress =
-        animationValue * (n - 1); // e.g. 0 → 11 for 12 months
-    final int fullPoints = progress.floor(); // fully revealed points
-    final double partial =
-        progress - fullPoints; // 0→1 fraction into next point
-
-    // Grid
+    final double progress = animationValue * (n - 1);
+    final int fullPoints = progress.floor();
+    final double partial = progress - fullPoints;
     final gridPaint = Paint()
       ..color = AppTheme.borderLight
       ..strokeWidth = 0.6;
@@ -4758,17 +4751,12 @@ class _SplinePainter extends CustomPainter {
       final y = chartH - chartH * i / 4;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
-
-    // Build all points at full height — but only reveal up to current progress
     final allPts = List.generate(
         n, (i) => Offset(i * stepX, chartH - (data[i] / chartMax) * chartH));
-
-    // Visible points: fully revealed ones + interpolated next point
     final List<Offset> pts = [];
     for (int i = 0; i <= fullPoints && i < n; i++) {
       pts.add(allPts[i]);
     }
-    // Add the partially revealed next point (interpolated X and Y from previous)
     if (fullPoints + 1 < n) {
       final from = allPts[fullPoints];
       final to = allPts[fullPoints + 1];
@@ -4779,7 +4767,6 @@ class _SplinePainter extends CustomPainter {
     }
 
     if (pts.length < 2) {
-      // Only one point visible — just draw the dot
       _drawDot(canvas, pts.first);
       return;
     }
@@ -4798,8 +4785,6 @@ class _SplinePainter extends CustomPainter {
 
     final splinePath = buildSpline(pts);
     final lastPt = pts.last;
-
-    // Fill — close path down to baseline only up to current X
     final fillPath = Path.from(splinePath);
     fillPath.lineTo(lastPt.dx, chartH);
     fillPath.lineTo(0, chartH);
@@ -4814,8 +4799,6 @@ class _SplinePainter extends CustomPainter {
         ).createShader(Rect.fromLTWH(0, 0, size.width, chartH))
         ..style = PaintingStyle.fill,
     );
-
-    // Stroke
     canvas.drawPath(
       splinePath,
       Paint()
@@ -4824,15 +4807,10 @@ class _SplinePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round,
     );
-
-    // Dots — only on fully revealed points (not the partial leading edge)
     for (int i = 0; i < pts.length - 1; i++) {
       _drawDot(canvas, pts[i]);
     }
-    // Also draw dot on the last partial point so the leading edge has a dot
     _drawDot(canvas, lastPt);
-
-    // Labels
     final tp = TextPainter(textDirection: TextDirection.ltr);
     for (int i = 0; i < labels.length; i++) {
       tp.text = TextSpan(
@@ -4866,10 +4844,6 @@ class _SplinePainter extends CustomPainter {
       old.data != data ||
       old.labels != labels;
 }
-
-// ═══════════════════════════════════════════════════════════
-//  HABIT ACTIONS BOTTOM SHEET
-// ═══════════════════════════════════════════════════════════
 
 void showHabitActions(BuildContext context, Habit habit, HabitStore store) {
   showDialog(
@@ -4952,10 +4926,6 @@ class _ATile extends StatelessWidget {
       );
 }
 
-// ═══════════════════════════════════════════════════════════
-//  CALENDAR BOTTOM SHEET
-// ═══════════════════════════════════════════════════════════
-
 void _showCal(BuildContext context, Habit habit, HabitStore store) {
   showDialog(
     context: context,
@@ -5022,7 +4992,6 @@ class _CalSheetState extends State<_CalSheet> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        // Month navigator
         Row(children: [
           GestureDetector(
               onTap: () => setState(
@@ -5043,9 +5012,7 @@ class _CalSheetState extends State<_CalSheet> {
                   color: AppTheme.textPrimary, size: 20)),
         ]),
         const SizedBox(height: 14),
-        // Two-column layout: left = date info, right = grid
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // LEFT: month abbr / full day name / large date number
           SizedBox(
               width: 76,
               child: Column(
@@ -5071,7 +5038,6 @@ class _CalSheetState extends State<_CalSheet> {
                 ],
               )),
           const SizedBox(width: 10),
-          // RIGHT: weekday labels + grid
           Expanded(
               child: Column(children: [
             Row(
@@ -5156,10 +5122,6 @@ class _CalSheetState extends State<_CalSheet> {
     );
   }
 }
-
-// ═══════════════════════════════════════════════════════════
-//  CREATE / EDIT HABIT SHEET
-// ═══════════════════════════════════════════════════════════
 
 void showCreateDialog(BuildContext context, HabitStore store,
     {Habit? existing}) {
@@ -5291,8 +5253,6 @@ class _CreateSheetState extends State<_CreateSheet> {
                     hint: widget.store.text('description'),
                     maxLines: 2),
                 const SizedBox(height: 14),
-
-                // Selected icon preview
                 Row(children: [
                   Container(
                     width: 44,
@@ -5315,8 +5275,6 @@ class _CreateSheetState extends State<_CreateSheet> {
                           color: AppTheme.textSecondary)),
                 ]),
                 const SizedBox(height: 8),
-
-                // Icon category tabs
                 SizedBox(
                   height: 30,
                   child: ListView.builder(
@@ -5331,21 +5289,18 @@ class _CreateSheetState extends State<_CreateSheet> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 5),
                           decoration: BoxDecoration(
-                            color: Colors.transparent, // Fixed to transparent
+                            color: Colors.transparent,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                                 color: active
                                     ? AppTheme.textPrimary
                                     : AppTheme.cardBorder,
-                                width: active
-                                    ? 1.5
-                                    : 1.0), // Slightly thicker when active
+                                width: active ? 1.5 : 1.0),
                           ),
                           child: Text(kIconCategories[i].name,
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  // Adapts beautifully to Dark/Light mode
                                   color: AppTheme.textPrimary)),
                         ),
                       );
@@ -5353,8 +5308,6 @@ class _CreateSheetState extends State<_CreateSheet> {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // Icon grid
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
