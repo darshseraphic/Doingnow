@@ -6195,7 +6195,6 @@ class _NotificationPermissionScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              // Don't allow button
               SizedBox(
                 width: double.infinity,
                 child: GestureDetector(
@@ -6363,10 +6362,6 @@ class _SBtn extends StatelessWidget {
         ),
       );
 }
-
-// ═══════════════════════════════════════════════════════════
-//  HELPERS
-// ═══════════════════════════════════════════════════════════
 
 String _monthAbbr(int month) {
   const names = [
