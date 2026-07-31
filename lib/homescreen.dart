@@ -3779,8 +3779,6 @@ class _StatisticsTabState extends State<StatisticsTab> {
                 );
               }),
               const SizedBox(height: 10),
-
-              // YEAR GRID CARD
               _Card(
                   child: Column(children: [
                 Row(children: [
@@ -4580,7 +4578,6 @@ class _IconSq extends StatelessWidget {
       );
 }
 
-// Cell types
 enum _CT { done, undone, gray, empty }
 
 class _DayCell extends StatelessWidget {
@@ -5344,8 +5341,6 @@ class _CreateSheetState extends State<_CreateSheet> {
                   },
                 ),
                 const SizedBox(height: 12),
-
-                // Category
                 _DropF(
                   label: _cat.text.isEmpty
                       ? widget.store.text('category')
@@ -5355,9 +5350,6 @@ class _CreateSheetState extends State<_CreateSheet> {
                   isSelected: _cat.text.isNotEmpty,
                 ),
                 const SizedBox(height: 10),
-
-                // Completions per day
-
                 Text(widget.store.text('reminder'),
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
@@ -5375,7 +5367,7 @@ class _CreateSheetState extends State<_CreateSheet> {
                         margin: const EdgeInsets.symmetric(horizontal: 2),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.transparent, // Fixed to transparent
+                          color: Colors.transparent,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                               color: sel
@@ -5388,17 +5380,12 @@ class _CreateSheetState extends State<_CreateSheet> {
                             style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
-                                color: AppTheme.textPrimary)), // Adaptive text
+                                color: AppTheme.textPrimary)),
                       ),
                     ),
                   );
                 })),
-
-// ----------------------------------------------------
-// ADDED SPACING: This separates the days from the time
                 const SizedBox(height: 12),
-// ----------------------------------------------------
-
                 GestureDetector(
                   onTap: () async {
                     final t = await showTimePicker(
@@ -5426,8 +5413,6 @@ class _CreateSheetState extends State<_CreateSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-// Notification toggle for this habit
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -5450,7 +5435,6 @@ class _CreateSheetState extends State<_CreateSheet> {
                   ]),
                 ),
                 const SizedBox(height: 16),
-
                 Text(widget.store.text('showStreak'),
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
@@ -5465,7 +5449,7 @@ class _CreateSheetState extends State<_CreateSheet> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.transparent, // Fixed to transparent
+                          color: Colors.transparent,
                           borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(12),
                               bottomLeft: Radius.circular(12)),
@@ -5480,7 +5464,7 @@ class _CreateSheetState extends State<_CreateSheet> {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontWeight: FontWeight.w500,
-                                color: AppTheme.textPrimary)), // Adaptive text
+                                color: AppTheme.textPrimary)),
                       ),
                     ),
                   ),
@@ -5491,7 +5475,7 @@ class _CreateSheetState extends State<_CreateSheet> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.transparent, // Fixed to transparent
+                          color: Colors.transparent,
                           borderRadius: const BorderRadius.only(
                               topRight: Radius.circular(12),
                               bottomRight: Radius.circular(12)),
@@ -5506,13 +5490,12 @@ class _CreateSheetState extends State<_CreateSheet> {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontWeight: FontWeight.w500,
-                                color: AppTheme.textPrimary)), // Adaptive text
+                                color: AppTheme.textPrimary)),
                       ),
                     ),
                   ),
                 ]),
                 const SizedBox(height: 24),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -5520,7 +5503,6 @@ class _CreateSheetState extends State<_CreateSheet> {
                       backgroundColor: _title.text.trim().isEmpty
                           ? AppTheme.gray
                           : AppTheme.textPrimary,
-                      // Adjusted foreground to fix the same white-on-white bug for the Save button
                       foregroundColor: AppTheme.surface,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
@@ -5545,11 +5527,6 @@ class _CreateSheetState extends State<_CreateSheet> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  THEMED SWITCH
-// ═══════════════════════════════════════════════════════════
-
-/// A Switch that uses black thumb/track in light mode and white thumb in dark.
 class _ThemedSwitch extends StatefulWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -5638,10 +5615,6 @@ class _ThemedSwitchState extends State<_ThemedSwitch> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  ONBOARDING FLOW
-// ═══════════════════════════════════════════════════════════
-
 class _OnboardingFlow extends StatefulWidget {
   final VoidCallback onComplete;
   const _OnboardingFlow({required this.onComplete});
@@ -5689,7 +5662,6 @@ class _OnboardingFlowState extends State<_OnboardingFlow> {
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
             child: Column(children: [
-              // Page indicator dots
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
@@ -5832,7 +5804,6 @@ class _ObPage extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Icon circle
         Container(
           width: 50,
           height: 50,
@@ -5885,12 +5856,9 @@ class _ObPage extends StatelessWidget {
   }
 }
 
-// ── Onboarding preview widgets ──────────────────────────
-
 class _PreviewMonthCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // Matches exact layout of _MonthCard
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
       decoration: BoxDecoration(
@@ -5981,7 +5949,6 @@ class _PreviewYearCard extends StatelessWidget {
                   fontWeight: FontWeight.w500)),
         ]),
         const SizedBox(height: 10),
-        // Preview dot grid: 5 rows × 18 cols
         ...List.generate(
             5,
             (row) => Padding(
@@ -6014,7 +5981,6 @@ class _PreviewCleanUI extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      // Light card
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
@@ -6132,10 +6098,6 @@ class _ObStep extends StatelessWidget {
       );
 }
 
-// ═══════════════════════════════════════════════════════════
-//  NOTIFICATION PERMISSION SCREEN
-// ═══════════════════════════════════════════════════════════
-
 class _NotificationPermissionScreen extends StatelessWidget {
   final VoidCallback onAllow;
   final VoidCallback onDeny;
@@ -6154,7 +6116,6 @@ class _NotificationPermissionScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-              // Icon
               Container(
                 width: 80,
                 height: 80,
@@ -6170,7 +6131,6 @@ class _NotificationPermissionScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
-              // Title
               Text(
                 'Stay on track',
                 style: TextStyle(
@@ -6181,7 +6141,6 @@ class _NotificationPermissionScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 14),
-              // Description
               Text(
                 'Enable notifications to get reminders for your habits.',
                 style: TextStyle(
@@ -6213,7 +6172,6 @@ class _NotificationPermissionScreen extends StatelessWidget {
                     ]),
               ),
               const Spacer(),
-              // Allow button
               SizedBox(
                 width: double.infinity,
                 child: GestureDetector(
