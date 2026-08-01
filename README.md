@@ -6,6 +6,22 @@ Welcome to the definitive documentation for **doingnow**, a privacy-focused, off
 
 ## Executive Summary
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8dccea53-16ea-4f6f-8e6c-d0ef69368128" alt="1" width="19%" />
+  <img src="https://github.com/user-attachments/assets/659732d4-ed58-48e3-82e7-6d4e85761ec8" alt="2" width="19%" />
+  <img src="https://github.com/user-attachments/assets/397c04d3-8688-4f76-b63c-0cd42878affa" alt="3" width="19%" />
+  <img src="https://github.com/user-attachments/assets/ce6b31d5-0c0d-45ce-8847-234e5753b4b6" alt="4" width="19%" />
+  <img src="https://github.com/user-attachments/assets/fc9e6224-c972-47e4-b841-ac0a7470bc45" alt="5" width="19%" />
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/dbe6f3bf-067d-447a-b0c6-d0d40147dccd" alt="6" width="19%" />
+  <img src="https://github.com/user-attachments/assets/f4bd042e-7a3c-4889-8b11-f36202a0dc03" alt="7" width="19%" />
+  <img src="https://github.com/user-attachments/assets/3822e04a-2ef0-4017-af8c-32eca8b32da3" alt="8" width="19%" />
+  <img src="https://github.com/user-attachments/assets/2b22f8d6-8943-489f-9073-8d2dd250fd7e" alt="9" width="19%" />
+  <img src="https://github.com/user-attachments/assets/babe1205-885b-4d30-b081-f8a0300156a9" alt="10" width="19%" />
+</p>
+
 Modern habit trackers often trap users inside bloated subscription models, clutter screens with distracting social features, or collect personal data for marketing purposes. **doingnow** offers a direct counter-response: a distraction-free environment where personal growth remains entirely private.
 
 The application stores every piece of user data directly on the device filesystem within an isolated, local file storage architecture. It features custom streak tracking engines for both daily and weekly intervals, deep statistical breakdowns across monthly and yearly horizons, a visual system containing 11 specialized icon categories, a light/dark theme engine, and complete localization across 22 global languages.
