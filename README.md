@@ -1,4 +1,4 @@
-# doingnow: Minimalist, Privacy-First Habit Tracker & Personal Accountability System
+# Doingnow: Minimalist, Privacy-First Habit Tracker & Personal Accountability System
 
 Welcome to the definitive documentation for **doingnow**, a privacy-focused, offline-first, highly configurable habit-tracking application designed and created by **darshseraphic**. Built with a focus on simplicity, aesthetic minimalism, and user autonomy, **doingnow** helps individuals build meaningful daily routines, track long-term progress, and organize life goals without invasive ads, hidden telemetry, cloud dependencies, or subscription paywalls.
 
