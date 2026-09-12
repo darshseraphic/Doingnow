@@ -160,3 +160,4 @@ native/
 wrapper/
 android/gradle/wrapper/
 .gradle/
+debug-symbols/
