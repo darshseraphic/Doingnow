@@ -2458,7 +2458,7 @@ final _globalStore = HabitStore();
 class _ResponsiveWrapper extends StatelessWidget {
   final Widget child;
   final double maxWidth;
-  const _ResponsiveWrapper({required this.child, this.maxWidth = 680});
+  const _ResponsiveWrapper({required this.child}) : maxWidth = 680;
 
   @override
   Widget build(BuildContext context) {
@@ -2909,7 +2909,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
-  int _prevTab = 0;
   Key _statsKey = UniqueKey();
 
   Key _yearKey = UniqueKey();
@@ -2946,7 +2945,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _pages[4],
         ];
       }
-      _prevTab = _tab;
       _tab = i;
     });
   }
@@ -3533,7 +3531,6 @@ class _YearDotGridState extends State<_YearDotGrid>
   }
 
   int _countScheduledPastDays() {
-    final now = DateTime.now();
     final start = DateTime(widget.year, 1, 1);
     final totalDays =
         DateTime(widget.year, 12, 31).difference(start).inDays + 1;
@@ -3891,10 +3888,7 @@ class _StreakCard extends StatefulWidget {
   final String label;
   final int value;
   const _StreakCard(
-      {super.key,
-      required this.iconData,
-      required this.label,
-      required this.value});
+      {required this.iconData, required this.label, required this.value});
   @override
   State<_StreakCard> createState() => _StreakCardState();
 }
@@ -4516,7 +4510,7 @@ class _HabitHeader extends StatelessWidget {
   final Habit habit;
   final HabitStore store;
   final String? sub;
-  const _HabitHeader({required this.habit, required this.store, this.sub});
+  const _HabitHeader({required this.habit, required this.store}) : sub = null;
 
   @override
   Widget build(BuildContext context) => Row(children: [
@@ -5796,8 +5790,8 @@ class _ObPage extends StatelessWidget {
       required this.title,
       required this.body,
       this.bullets,
-      this.extra,
-      this.preview});
+      this.preview})
+      : extra = null;
 
   @override
   Widget build(BuildContext context) {

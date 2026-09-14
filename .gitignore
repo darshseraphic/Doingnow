@@ -161,3 +161,7 @@ wrapper/
 android/gradle/wrapper/
 .gradle/
 debug-symbols/
+ios/
+linux/
+web/
+windows/
